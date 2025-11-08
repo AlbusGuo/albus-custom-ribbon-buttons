@@ -1,8 +1,9 @@
-import { App, PluginSettingTab, Setting, Plugin } from 'obsidian';
+import { App, PluginSettingTab, Setting, Plugin, setIcon } from 'obsidian';
 import { CustomButton } from '../types';
 import { createCustomButton } from '../settings';
 import { FileSuggestModal } from '../modals/fileSuggestModal';
 import { CommandSuggestModal } from '../modals/commandSuggestModal';
+import { IconSuggestModal } from '../modals/iconSuggestModal';
 
 // 前向声明主类
 interface RibbonVaultButtonsPlugin extends Plugin {
@@ -97,7 +98,8 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	 */
 	private addCustomButton() {
 		const newButton = createCustomButton();
-		this.plugin.settings.customButtons.unshift(newButton);
+		// 添加到列表末尾，而不是开头
+		this.plugin.settings.customButtons.push(newButton);
 		this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
@@ -175,17 +177,39 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	 * 创建图标设置
 	 */
 	private createIconSetting(content: HTMLElement, button: CustomButton) {
-		new Setting(content)
+		const setting = new Setting(content)
 			.setName('图标')
-			.setDesc('输入 Lucide 图标名称')
-			.addText(text => text
-				.setValue(button.icon)
-				.setPlaceholder('lucide-home')
-				.onChange(async (value) => {
-					button.icon = value;
-					await this.plugin.saveSettings();
-					this.plugin.initVaultButtons();
-				}));
+			.setDesc('点击图标选择');
+
+		// 创建简洁的图标按钮（只显示图标）
+		const selectButton = setting.controlEl.createEl('button', {
+			cls: 'icon-picker-button-integrated'
+		});
+
+		// 图标预览容器
+		const iconPreview = selectButton.createDiv({ cls: 'icon-picker-preview-integrated' });
+		
+		// 更新图标预览
+		const updateIconDisplay = (iconNameValue: string) => {
+			iconPreview.empty();
+			try {
+				setIcon(iconPreview, iconNameValue || 'help-circle');
+			} catch (error) {
+				iconPreview.setText('?');
+			}
+		};
+		updateIconDisplay(button.icon);
+
+		// 点击打开模态框
+		selectButton.addEventListener('click', () => {
+			const modal = new IconSuggestModal(this.app, async (selectedIcon) => {
+				button.icon = selectedIcon;
+				updateIconDisplay(selectedIcon);
+				await this.plugin.saveSettings();
+				this.plugin.initVaultButtons();
+			});
+			modal.open();
+		});
 	}
 
 	/**
