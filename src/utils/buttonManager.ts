@@ -55,13 +55,6 @@ export class ButtonManager {
 	private initBuiltInButtons() {
 		const builtInButtons: BuiltInButton[] = [
 			{
-				id: 'theme',
-				tooltip: '切换深色/浅色模式',
-				icon: 'lucide-sun-moon',
-				onClick: () => this.switchLightDark(),
-				draggable: false
-			},
-			{
 				id: 'vault',
 				tooltip: '切换库',
 				icon: 'vault',
