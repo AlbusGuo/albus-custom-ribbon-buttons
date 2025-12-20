@@ -1,10 +1,12 @@
-import { RibbonVaultButtonsSettings, CustomButton } from './types';
+import { RibbonVaultButtonsSettings, CustomButton, DividerItem } from './types';
 
 /**
  * 默认设置
  */
 export const DEFAULT_SETTINGS: RibbonVaultButtonsSettings = {
-	customButtons: []
+	buttonItems: [],
+	hideBuiltInButtons: true,
+	hideDefaultActions: false
 };
 
 /**
@@ -18,6 +20,16 @@ export function createCustomButton(): CustomButton {
 		command: '',
 		file: '',
 		url: ''
+	};
+}
+
+/**
+ * 创建新的分割线
+ */
+export function createDivider(): DividerItem {
+	return {
+		type: 'divider',
+		id: `divider-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 	};
 }
 

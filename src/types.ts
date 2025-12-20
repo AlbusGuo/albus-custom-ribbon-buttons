@@ -6,6 +6,16 @@ import { TFile } from 'obsidian';
 export type ButtonType = 'command' | 'file' | 'url';
 
 /**
+ * 分割线配置
+ */
+export interface DividerItem {
+	/** 类型标识 */
+	type: 'divider';
+	/** 分割线ID */
+	id: string;
+}
+
+/**
  * 自定义按钮配置
  */
 export interface CustomButton {
@@ -24,11 +34,20 @@ export interface CustomButton {
 }
 
 /**
+ * 按钮项类型（按钮或分割线）
+ */
+export type ButtonItem = CustomButton | DividerItem;
+
+/**
  * 插件设置接口
  */
 export interface RibbonVaultButtonsSettings {
-	/** 自定义按钮列表 */
-	customButtons: CustomButton[];
+	/** 按钮项列表（包含按钮和分割线） */
+	buttonItems: ButtonItem[];
+	/** 是否隐藏内置按钮 */
+	hideBuiltInButtons: boolean;
+	/** 是否隐藏默认功能区 */
+	hideDefaultActions: boolean;
 }
 
 /**

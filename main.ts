@@ -10,7 +10,7 @@ import { CustomButtonsSettingTab } from './src/settings/customButtonsSettingTab'
  */
 export default class RibbonVaultButtonsPlugin extends Plugin {
 	settings: RibbonVaultButtonsSettings;
-	private buttonManager: ButtonManager;
+	buttonManager: ButtonManager;
 	private styleEl: HTMLStyleElement | null = null;
 
 	async onload() {
@@ -27,7 +27,8 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		);
 		
 		// 应用样式和初始化按钮
-		this.buttonManager.applyStyleSettings();
+		this.buttonManager.applyStyleSettings(this.settings.hideBuiltInButtons);
+		this.buttonManager.applyDefaultActionsStyle(this.settings.hideDefaultActions);
 		this.initVaultButtons();
 		
 		// 添加设置选项卡
@@ -64,16 +65,13 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
   font-weight: 600;
 }
 
-/* 描述文本样式 */
-.basic-vault-button-description {
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.4;
-  margin-bottom: 16px;
-  padding: 12px;
-  background: var(--background-primary);
-  border-radius: 6px;
-  border-left: 2px solid var(--interactive-accent);
+
+
+/* 添加按钮容器样式 */
+.basic-vault-button-add-container {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
 }
 
 /* 添加按钮样式 */
@@ -90,27 +88,16 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
   font-size: 13px;
   font-weight: 500;
   transition: background 0.2s ease;
-  margin: 16px 0;
+  flex: 1;
 }
 
 .basic-vault-button-add-btn:hover {
   background: var(--interactive-accent-hover);
 }
 
-/* 分割线 */
-.basic-vault-button-divider {
-  height: 1px;
-  background: var(--background-modifier-border);
-  margin: 16px 0;
-}
 
-/* 部分标题 */
-.basic-vault-button-section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-normal);
-  margin-bottom: 12px;
-}
+
+
 
 /* 空状态样式 */
 .basic-vault-button-empty {
@@ -133,131 +120,141 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
   opacity: 0.7;
 }
 
-/* 设置项卡片样式 - 紧凑版本 */
-.basic-vault-button-setting-item {
-  background: var(--background-secondary);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
+/* 分割线 */
+.basic-vault-button-divider {
+  height: 1px;
+  background: var(--background-modifier-border);
+  margin: 12px 0;
+}
+
+/* 紧凑型设置项样式 */
+
+/* 设置项间距优化 */
+.basic-vault-button-container .setting-item {
+  padding: 8px 0;
+  margin-bottom: 0;
+}
+
+/* 可点击的输入框样式 */
+.basic-vault-button-container .setting-item-control input[type="text"]:focus {
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* 命令和文件输入框的特殊样式 */
+.basic-vault-button-container .setting-item-control input[placeholder*="命令ID"],
+.basic-vault-button-container .setting-item-control input[placeholder*="文件路径"] {
+  cursor: pointer;
+  background: var(--background-modifier-form-field);
   border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 4px 8px;
   transition: all 0.2s ease;
 }
 
-.basic-vault-button-setting-item:hover {
+.basic-vault-button-container .setting-item-control input[placeholder*="命令ID"]:hover,
+.basic-vault-button-container .setting-item-control input[placeholder*="文件路径"]:hover {
   border-color: var(--interactive-accent);
+  background: var(--background-primary);
 }
 
-/* 设置项头部 */
-.basic-vault-button-setting-header {
+.basic-vault-button-container .setting-item-control input[placeholder*="命令ID"]:focus,
+.basic-vault-button-container .setting-item-control input[placeholder*="文件路径"]:focus {
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* 隐藏搜索输入框的放大镜图标 */
+.basic-vault-button-container .setting-item-control .search-input-container::before {
+  display: none !important;
+}
+
+/* 隐藏搜索输入框的清除按钮图标 */
+.basic-vault-button-container .setting-item-control .search-input-container .clickable-icon {
+  display: none !important;
+}
+
+/* 单行布局控件样式 */
+.basic-vault-button-container .setting-item-control {
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  flex-wrap: wrap;
 }
 
-.basic-vault-button-setting-title {
-  font-weight: 600;
-  color: var(--text-normal);
-  font-size: 14px;
+.basic-vault-button-container .setting-item-control input[type="text"],
+.basic-vault-button-container .setting-item-control select {
+  min-width: 120px;
+  max-width: 150px;
+  font-size: 12px;
+  padding: 4px 6px;
 }
 
-/* 操作按钮组 */
-.basic-vault-button-setting-actions {
+.basic-vault-button-container .setting-item-control .dropdown {
+  min-width: 80px;
+  max-width: 100px;
+}
+
+/* 紧凑型图标选择器样式 */
+.icon-picker-button-compact {
   display: flex;
-  gap: 4px;
-}
-
-.basic-vault-button-action-btn {
-  padding: 4px 8px;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 4px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
   background: var(--background-primary);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 11px;
-  height: 24px;
+  font-size: 14px;
+}
+
+.icon-picker-button-compact:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.icon-picker-preview-compact {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
-}
-
-.basic-vault-button-action-btn:hover:not(:disabled) {
-  background: var(--background-modifier-hover);
+  width: 20px;
+  height: 20px;
   color: var(--text-normal);
 }
 
-.basic-vault-button-action-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.icon-picker-preview-compact svg {
+  width: 16px;
+  height: 16px;
 }
 
-.basic-vault-button-delete-btn {
-  background: var(--color-red);
-  border-color: var(--color-red);
-  color: white;
-  font-size: 11px;
+/* 删除按钮样式 */
+.basic-vault-button-container .setting-item-extra-button {
+  color: var(--color-red);
+  margin-left: 4px;
 }
 
-.basic-vault-button-delete-btn:hover {
-  background: var(--color-red-dark);
+.basic-vault-button-container .setting-item-extra-button:hover {
+  color: var(--color-red-dark);
 }
 
-/* 设置内容区域 */
-.basic-vault-button-setting-content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* 设置项样式优化 */
-.basic-vault-button-setting-item .setting-item {
-  border-top: none;
-  padding-top: 0;
-  padding-bottom: 0;
-  background: transparent;
-}
-
-.basic-vault-button-setting-item .setting-item-info {
-  margin-bottom: 4px;
-}
-
-.basic-vault-button-setting-item .setting-item-name {
-  font-weight: 600;
-  color: var(--text-normal);
-  font-size: 13px;
-  margin-bottom: 2px;
-}
-
-.basic-vault-button-setting-item .setting-item-description {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.3;
-}
-
-.basic-vault-button-setting-item .setting-item-control {
-  margin-top: 4px;
-}
-
-/* 输入框和下拉菜单样式优化 */
-.basic-vault-button-setting-item input[type="text"],
-.basic-vault-button-setting-item .dropdown {
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 13px;
-  transition: all 0.2s ease;
-  min-height: 28px;
-}
-
-.basic-vault-button-setting-item input[type="text"]:focus,
-.basic-vault-button-setting-item .dropdown:focus {
-  border-color: var(--interactive-accent);
-  box-shadow: 0 0 0 1px rgba(var(--interactive-accent-rgb), 0.1);
-  outline: none;
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .basic-vault-button-container .setting-item-control {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  
+  .basic-vault-button-container .setting-item-control input[type="text"],
+  .basic-vault-button-container .setting-item-control select,
+  .basic-vault-button-container .setting-item-control .dropdown {
+    max-width: 100%;
+    width: 100%;
+  }
 }
 
 /* 命令搜索样式 */
@@ -312,16 +309,59 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
   background-color: var(--background-modifier-hover);
 }
 
+/* 分割线拖拽样式 */
+.custom-ribbon-divider {
+  position: relative;
+  cursor: move;
+  margin: 4px 0;
+  flex-shrink: 0;
+  width: 100%;
+  height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-ribbon-divider::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background-color: var(--divider-color);
+  opacity: 0.5;
+}
+
+.custom-ribbon-divider:hover::before {
+  opacity: 1;
+  background-color: var(--divider-color);
+}
+
+.custom-ribbon-divider.dragging::before {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.custom-ribbon-divider.drag-over::before {
+  height: 4px;
+  background-color: var(--divider-color);
+  opacity: 1;
+}
+
+/* 拖拽时的视觉提示 */
+.custom-ribbon-divider:hover {
+  background-color: var(--background-modifier-hover);
+  border-radius: 2px;
+}
+
+.custom-ribbon-divider.dragging {
+  background-color: var(--background-modifier-hover);
+  border-radius: 2px;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .basic-vault-button-setting-header {
+  .basic-vault-button-add-container {
     flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  
-  .basic-vault-button-setting-actions {
-    align-self: flex-end;
   }
   
   .basic-vault-button-add-btn {
@@ -329,24 +369,10 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
     justify-content: center;
   }
   
-  .basic-vault-button-setting-item {
-    padding: 12px;
-    margin-bottom: 8px;
-  }
-  
   .basic-vault-button-empty {
     padding: 24px 16px;
     margin: 12px 0;
   }
-}
-
-/* 暗色模式优化 */
-.theme-dark .basic-vault-button-setting-item {
-  background: var(--background-secondary);
-}
-
-.theme-dark .basic-vault-button-description {
-  background: var(--background-secondary);
 }
 		`;
 
@@ -375,7 +401,7 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	 */
 	initVaultButtons() {
 		if (this.buttonManager) {
-			this.buttonManager.initVaultButtons(this.settings.customButtons);
+			this.buttonManager.initVaultButtons(this.settings.buttonItems, this.settings.hideBuiltInButtons);
 		}
 	}
 
@@ -390,14 +416,14 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	}
 
 	/**
-	 * 重新排序按钮
+	 * 重新排序按钮项
 	 */
 	reorderButtons(sourceIndex: number, targetIndex: number) {
 		if (sourceIndex === targetIndex) return;
 		
 		// 重新排序数组
-		const [movedButton] = this.settings.customButtons.splice(sourceIndex, 1);
-		this.settings.customButtons.splice(targetIndex, 0, movedButton);
+		const [movedItem] = this.settings.buttonItems.splice(sourceIndex, 1);
+		this.settings.buttonItems.splice(targetIndex, 0, movedItem);
 		
 		// 保存设置并重新初始化按钮
 		this.saveSettings();

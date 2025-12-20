@@ -1,15 +1,16 @@
 import { App, PluginSettingTab, Setting, Plugin, setIcon } from 'obsidian';
-import { CustomButton } from '../types';
-import { createCustomButton } from '../settings';
+import { CustomButton, ButtonItem, DividerItem } from '../types';
+import { createCustomButton, createDivider } from '../settings';
 import { FileSuggestModal } from '../modals/fileSuggestModal';
 import { CommandSuggestModal } from '../modals/commandSuggestModal';
 import { IconSuggestModal } from '../modals/iconSuggestModal';
 
 // 前向声明主类
 interface RibbonVaultButtonsPlugin extends Plugin {
-	settings: { customButtons: CustomButton[] };
+	settings: { buttonItems: ButtonItem[]; hideBuiltInButtons: boolean; hideDefaultActions: boolean };
 	saveSettings(): Promise<void>;
 	initVaultButtons(): void;
+	buttonManager: any;
 }
 
 /**
@@ -27,33 +28,48 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		this.createHeader(containerEl);
-		this.createDescription(containerEl);
+		this.createGlobalSettings(containerEl);
 
-		if (this.plugin.settings.customButtons.length === 0) {
+		if (this.plugin.settings.buttonItems.length === 0) {
 			this.createEmptyState(containerEl);
 		} else {
 			this.createButtonsList(containerEl);
 		}
 
-		this.createAddButton(containerEl);
+		this.createAddButtons(containerEl);
 	}
 
-	/**
-	 * 创建页面标题
-	 */
-	private createHeader(containerEl: HTMLElement) {
-		containerEl.createEl('h2', { text: '自定义底部侧边栏按钮' });
-	}
+	
 
 	/**
-	 * 创建描述文本
+	 * 创建全局设置
 	 */
-	private createDescription(containerEl: HTMLElement) {
-		const description = containerEl.createDiv('basic-vault-button-description');
-		description.setText(
-			'在此添加和管理您的底部侧边栏按钮. 您可以在侧边栏中直接拖拽自定义按钮来重新排序 (内置按钮不支持拖拽).'
-		);
+	private createGlobalSettings(containerEl: HTMLElement) {
+		new Setting(containerEl)
+			.setName('调整内置按钮到左侧功能区')
+			.setDesc('开启后将 Obsidian 原生的库切换、设置、帮助等按钮布局调整到左侧功能区')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.hideBuiltInButtons)
+				.onChange(async (value) => {
+					this.plugin.settings.hideBuiltInButtons = value;
+					await this.plugin.saveSettings();
+					// 重新应用样式设置
+					this.plugin.buttonManager.applyStyleSettings(value);
+					// 重新初始化按钮以显示/隐藏我们的替代按钮
+					this.plugin.initVaultButtons();
+				}));
+
+		new Setting(containerEl)
+			.setName('隐藏默认功能区')
+			.setDesc('开启后将隐藏 Obsidian 的默认功能区')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.hideDefaultActions)
+				.onChange(async (value) => {
+					this.plugin.settings.hideDefaultActions = value;
+					await this.plugin.saveSettings();
+					// 应用或移除默认功能区隐藏样式
+					this.plugin.buttonManager.applyDefaultActionsStyle(value);
+				}));
 	}
 
 	/**
@@ -72,24 +88,38 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	 * 创建按钮列表
 	 */
 	private createButtonsList(containerEl: HTMLElement) {
-		const listTitle = containerEl.createDiv('basic-vault-button-section-title');
-		listTitle.setText('已配置的按钮');
+		// 创建容器用于应用紧凑样式
+		const buttonsContainer = containerEl.createDiv('basic-vault-button-container');
 
-		this.plugin.settings.customButtons.forEach((button, index) => {
-			this.createButtonSetting(containerEl, button, index);
+		this.plugin.settings.buttonItems.forEach((item, index) => {
+			if (item.type === 'divider') {
+				this.createDividerSetting(buttonsContainer, item as DividerItem, index);
+			} else {
+				this.createButtonSetting(buttonsContainer, item as CustomButton, index);
+			}
 		});
 	}
 
 	/**
-	 * 创建添加按钮
+	 * 创建添加按钮组
 	 */
-	private createAddButton(containerEl: HTMLElement) {
-		const addButton = containerEl.createEl('button', {
+	private createAddButtons(containerEl: HTMLElement) {
+		const addButtonsContainer = containerEl.createDiv('basic-vault-button-add-container');
+		
+		const addButton = addButtonsContainer.createEl('button', {
 			text: '添加新按钮',
 			cls: 'basic-vault-button-add-btn'
 		});
 		addButton.addEventListener('click', () => {
 			this.addCustomButton();
+		});
+		
+		const addDividerButton = addButtonsContainer.createEl('button', {
+			text: '添加分割线',
+			cls: 'basic-vault-button-add-btn'
+		});
+		addDividerButton.addEventListener('click', () => {
+			this.addDivider();
 		});
 	}
 
@@ -99,17 +129,29 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	private addCustomButton() {
 		const newButton = createCustomButton();
 		// 添加到列表末尾，而不是开头
-		this.plugin.settings.customButtons.push(newButton);
+		this.plugin.settings.buttonItems.push(newButton);
 		this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
 	}
 
 	/**
-	 * 删除按钮
+	 * 添加分割线
 	 */
-	private removeButton(index: number) {
-		this.plugin.settings.customButtons.splice(index, 1);
+	private addDivider() {
+		const newDivider = createDivider();
+		// 添加到列表末尾，而不是开头
+		this.plugin.settings.buttonItems.push(newDivider);
+		this.plugin.saveSettings();
+		this.plugin.initVaultButtons();
+		this.display();
+	}
+
+	/**
+	 * 删除按钮项
+	 */
+	private removeButtonItem(index: number) {
+		this.plugin.settings.buttonItems.splice(index, 1);
 		this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
@@ -119,90 +161,105 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	 * 创建单个按钮的设置项
 	 */
 	private createButtonSetting(containerEl: HTMLElement, button: CustomButton, index: number) {
-		const settingItem = containerEl.createDiv('basic-vault-button-setting-item');
-
-		this.createSettingHeader(settingItem, index);
-		this.createSettingContent(settingItem, button, index);
-	}
-
-	/**
-	 * 创建设置项头部
-	 */
-	private createSettingHeader(settingItem: HTMLElement, index: number) {
-		const header = settingItem.createDiv('basic-vault-button-setting-header');
-		header.createEl('span', {
-			text: `按钮 ${index + 1}`,
-			cls: 'basic-vault-button-setting-title'
-		});
-
-		const actions = header.createDiv('basic-vault-button-setting-actions');
-
-		const deleteButton = actions.createEl('button', {
-			text: '删除',
-			cls: 'basic-vault-button-action-btn basic-vault-button-delete-btn'
-		});
-		deleteButton.addEventListener('click', () => this.removeButton(index));
-	}
-
-	/**
-	 * 创建设置内容
-	 */
-	private createSettingContent(settingItem: HTMLElement, button: CustomButton, index: number) {
-		const content = settingItem.createDiv('basic-vault-button-setting-content');
-
-		this.createTooltipSetting(content, button);
-		this.createIconSetting(content, button);
-		this.createTypeSetting(content, button, index);
-		this.createTypeSpecificSetting(content, button, index);
-	}
-
-	/**
-	 * 创建提示文字设置
-	 */
-	private createTooltipSetting(content: HTMLElement, button: CustomButton) {
-		new Setting(content)
-			.setName('按钮名称')
-			.setDesc('鼠标悬停时显示的提示文字')
+		// 创建单行设置项，包含所有配置
+		const setting = new Setting(containerEl)
+			.setName('按钮')
 			.addText(text => text
+				.setPlaceholder('按钮名称')
 				.setValue(button.tooltip)
-				.setPlaceholder('例如：打开日记')
 				.onChange(async (value) => {
 					button.tooltip = value;
 					await this.plugin.saveSettings();
 					this.plugin.initVaultButtons();
 				}));
+
+		// 添加图标选择器
+		this.addIconPicker(setting, button);
+		
+		setting.addDropdown(dropdown => dropdown
+			.addOption('command', '命令')
+			.addOption('file', '文件')
+			.addOption('url', '网址')
+			.setValue(button.type)
+			.onChange(async (value) => {
+				button.type = value as 'command' | 'file' | 'url';
+				await this.plugin.saveSettings();
+				this.display();
+			}))
+			.addSearch(search => {
+				search.setValue(this.getValueForType(button));
+				search.setPlaceholder(this.getPlaceholderForType(button.type));
+				
+				// 根据类型设置不同的输入验证
+				if (button.type === 'url') {
+					search.inputEl.type = 'url';
+				}
+				
+				// 为命令类型添加选择器
+				if (button.type === 'command') {
+					const modal = new CommandSuggestModal(this.app, (command) => {
+						button.command = command.id;
+						search.setValue(command.id);
+						this.plugin.saveSettings();
+					});
+					
+					search.inputEl.addEventListener('click', () => {
+						modal.open();
+					});
+				}
+				
+				// 为文件类型添加选择器
+				if (button.type === 'file') {
+					const modal = new FileSuggestModal(this.app, (file) => {
+						button.file = file.path;
+						search.setValue(file.path);
+						this.plugin.saveSettings();
+					});
+					
+					search.inputEl.addEventListener('click', () => {
+						modal.open();
+					});
+				}
+				
+				search.onChange(value => {
+					this.setValueForType(button, value);
+					this.plugin.saveSettings();
+				});
+			})
+			.addExtraButton(extraButton => extraButton
+				.setIcon('trash')
+				.setTooltip('删除按钮')
+				.onClick(() => this.removeButtonItem(index)));
 	}
 
 	/**
-	 * 创建图标设置
+	 * 添加图标选择器
 	 */
-	private createIconSetting(content: HTMLElement, button: CustomButton) {
-		const setting = new Setting(content)
-			.setName('图标')
-			.setDesc('点击图标选择');
-
-		// 创建简洁的图标按钮（只显示图标）
-		const selectButton = setting.controlEl.createEl('button', {
-			cls: 'icon-picker-button-integrated'
+	private addIconPicker(setting: Setting, button: CustomButton) {
+		// 创建图标选择按钮
+		const iconButton = setting.controlEl.createEl('button', {
+			cls: 'icon-picker-button-compact'
 		});
 
-		// 图标预览容器
-		const iconPreview = selectButton.createDiv({ cls: 'icon-picker-preview-integrated' });
+		// 创建图标预览容器
+		const iconPreview = iconButton.createDiv({ cls: 'icon-picker-preview-compact' });
 		
-		// 更新图标预览
-		const updateIconDisplay = (iconNameValue: string) => {
+		// 更新图标预览的函数
+		const updateIconDisplay = (iconName: string) => {
 			iconPreview.empty();
 			try {
-				setIcon(iconPreview, iconNameValue || 'help-circle');
+				setIcon(iconPreview, iconName || 'help-circle');
 			} catch (error) {
 				iconPreview.setText('?');
 			}
 		};
+
+		// 初始化图标显示
 		updateIconDisplay(button.icon);
 
-		// 点击打开模态框
-		selectButton.addEventListener('click', () => {
-			const modal = new IconSuggestModal(this.app, async (selectedIcon) => {
+		// 点击打开图标选择模态框
+		iconButton.addEventListener('click', () => {
+			const modal = new IconSuggestModal(this.app, async (selectedIcon: string) => {
 				button.icon = selectedIcon;
 				updateIconDisplay(selectedIcon);
 				await this.plugin.saveSettings();
@@ -210,113 +267,71 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 			});
 			modal.open();
 		});
+
+		// 添加工具提示
+		iconButton.title = `当前图标: ${button.icon || 'help-circle'}`;
 	}
 
 	/**
-	 * 创建按钮类型设置
+	 * 根据按钮类型获取占位符文本
 	 */
-	private createTypeSetting(content: HTMLElement, button: CustomButton, index: number) {
-		new Setting(content)
-			.setName('按钮类型')
-			.setDesc('选择按钮点击时执行的操作')
-			.addDropdown(dropdown => dropdown
-				.addOption('command', '执行命令')
-				.addOption('file', '打开文件')
-				.addOption('url', '打开网址')
-				.setValue(button.type)
-				.onChange(async (value) => {
-					button.type = value as 'command' | 'file' | 'url';
-					await this.plugin.saveSettings();
-					this.display();
-				}));
+	private getPlaceholderForType(type: string): string {
+		switch (type) {
+			case 'command':
+				return '命令ID';
+			case 'file':
+				return '文件路径';
+			case 'url':
+				return '网址';
+			default:
+				return '值';
+		}
 	}
 
 	/**
-	 * 创建类型特定的设置
+	 * 根据按钮类型获取当前值
 	 */
-	private createTypeSpecificSetting(content: HTMLElement, button: CustomButton, index: number) {
+	private getValueForType(button: CustomButton): string {
 		switch (button.type) {
 			case 'command':
-				this.createCommandSetting(content, button);
+				return button.command;
+			case 'file':
+				return button.file;
+			case 'url':
+				return button.url;
+			default:
+				return '';
+		}
+	}
+
+	/**
+	 * 根据按钮类型设置值
+	 */
+	private setValueForType(button: CustomButton, value: string): void {
+		switch (button.type) {
+			case 'command':
+				button.command = value;
 				break;
 			case 'file':
-				this.createFileSetting(content, button);
+				button.file = value;
 				break;
 			case 'url':
-				this.createUrlSetting(content, button);
+				button.url = value;
 				break;
 		}
 	}
 
 	/**
-	 * 创建命令设置
+	 * 创建分割线设置项
 	 */
-	private createCommandSetting(content: HTMLElement, button: CustomButton) {
-		new Setting(content)
-			.setName('目标命令')
-			.setDesc('选择要执行的命令')
-			.addSearch(search => {
-				search.setValue(button.command);
-				search.setPlaceholder('例如：file-explorer:new-file');
-
-				const modal = new CommandSuggestModal(this.app, (command) => {
-					button.command = command.id;
-					search.setValue(command.id);
-					this.plugin.saveSettings();
-				});
-
-				search.inputEl.addEventListener('click', () => {
-					modal.open();
-				});
-
-				search.onChange(value => {
-					button.command = value;
-					this.plugin.saveSettings();
-				});
-			});
+	private createDividerSetting(containerEl: HTMLElement, divider: DividerItem, index: number) {
+		const setting = new Setting(containerEl)
+			.setName('分割线')
+			.addExtraButton(extraButton => extraButton
+				.setIcon('trash')
+				.setTooltip('删除分割线')
+				.onClick(() => this.removeButtonItem(index)));
 	}
 
-	/**
-	 * 创建文件设置
-	 */
-	private createFileSetting(content: HTMLElement, button: CustomButton) {
-		new Setting(content)
-			.setName('目标文件')
-			.setDesc('选择要打开的文件')
-			.addSearch(search => {
-				search.setValue(button.file);
-				search.setPlaceholder('例如：日记/2024.md');
-
-				const modal = new FileSuggestModal(this.app, (file) => {
-					button.file = file.path;
-					search.setValue(file.path);
-					this.plugin.saveSettings();
-				});
-
-				search.inputEl.addEventListener('click', () => {
-					modal.open();
-				});
-
-				search.onChange(value => {
-					button.file = value;
-					this.plugin.saveSettings();
-				});
-			});
-	}
-
-	/**
-	 * 创建URL设置
-	 */
-	private createUrlSetting(content: HTMLElement, button: CustomButton) {
-		new Setting(content)
-			.setName('网址链接')
-			.setDesc('输入要打开的完整网址')
-			.addText(text => text
-				.setValue(button.url)
-				.setPlaceholder('https://example.com')
-				.onChange(async (value) => {
-					button.url = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+	
 }

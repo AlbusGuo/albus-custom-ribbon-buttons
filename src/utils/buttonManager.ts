@@ -1,5 +1,5 @@
 import { App, TFile } from 'obsidian';
-import { CustomButton, BuiltInButton, DragState } from '../types';
+import { CustomButton, BuiltInButton, DragState, ButtonItem, DividerItem } from '../types';
 
 /**
  * 按钮管理器类
@@ -22,10 +22,12 @@ export class ButtonManager {
 	/**
 	 * 初始化所有按钮
 	 */
-	initVaultButtons(customButtons: CustomButton[]) {
+	initVaultButtons(buttonItems: ButtonItem[], hideBuiltInButtons: boolean = true) {
 		this.clearAllButtons();
-		this.initCustomButtons(customButtons);
-		this.initBuiltInButtons();
+		this.initButtonItems(buttonItems);
+		if (hideBuiltInButtons) {
+			this.initBuiltInButtons();
+		}
 	}
 
 	/**
@@ -41,11 +43,15 @@ export class ButtonManager {
 	}
 
 	/**
-	 * 初始化自定义按钮
+	 * 初始化按钮项（包含按钮和分割线）
 	 */
-	private initCustomButtons(customButtons: CustomButton[]) {
-		customButtons.forEach((button, index) => {
-			this.createCustomButton(button, index);
+	private initButtonItems(buttonItems: ButtonItem[]) {
+		buttonItems.forEach((item, index) => {
+			if (item.type === 'divider') {
+				this.createDivider(item as DividerItem, index);
+			} else {
+				this.createCustomButton(item as CustomButton, index);
+			}
 		});
 	}
 
@@ -91,7 +97,51 @@ export class ButtonManager {
 			this.handleButtonClick(button);
 		};
 
-		return this.createRibbonButton(buttonId, button.tooltip, button.icon, onClick, true);
+		return this.createRibbonButton(buttonId, button.tooltip, button.icon, onClick, true, index);
+	}
+
+	/**
+	 * 创建分割线
+	 */
+	private createDivider(divider: DividerItem, index: number) {
+		try {
+			// @ts-ignore
+			const leftRibbon = this.app.workspace.leftRibbon;
+			
+			// 创建分割线元素
+			const dividerEl = document.createElement('div');
+			dividerEl.className = 'custom-ribbon-divider';
+			
+			// 存储数组索引信息
+			dividerEl.dataset.arrayIndex = index.toString();
+			
+			// 添加拖拽功能
+			this.makeDividerDraggable(dividerEl, divider.id, index);
+			
+			// 添加到缎带
+			const ribbonContainer = leftRibbon as any;
+			if (ribbonContainer.ribbonActionsEl) {
+				ribbonContainer.ribbonActionsEl.appendChild(dividerEl);
+			} else if (ribbonContainer.ribbonSettingEl) {
+				ribbonContainer.ribbonSettingEl.appendChild(dividerEl);
+			} else {
+				// 尝试找到正确的容器
+				try {
+					const container = (ribbonContainer as any).children?.[0] || ribbonContainer;
+					container.appendChild(dividerEl);
+				} catch (e) {
+					console.warn('Could not find ribbon container:', e);
+				}
+			}
+			this.ribbonMap.set(divider.id, dividerEl);
+			
+			return dividerEl;
+		} catch (error) {
+			console.warn('Failed to create divider:', error);
+			const fallbackEl = document.createElement('div');
+			fallbackEl.style.display = 'none';
+			return fallbackEl;
+		}
 	}
 
 	/**
@@ -136,7 +186,8 @@ export class ButtonManager {
 		tooltip: string,
 		icon: string,
 		onClick: () => void,
-		draggable = false
+		draggable = false,
+		arrayIndex = -1
 	): HTMLElement {
 		try {
 			// @ts-ignore
@@ -147,13 +198,31 @@ export class ButtonManager {
 				onClick();
 			});
 
+			// 存储数组索引信息
+			if (arrayIndex >= 0) {
+				button.dataset.arrayIndex = arrayIndex.toString();
+			}
+
 			if (draggable) {
 				this.makeButtonDraggable(button, id);
 			}
 
 			this.ribbonMap.set(id, button);
-			// @ts-ignore
-			leftRibbon.ribbonSettingEl.appendChild(button);
+			// 添加到缎带
+			const ribbonContainer = leftRibbon as any;
+			if (ribbonContainer.ribbonActionsEl) {
+				ribbonContainer.ribbonActionsEl.appendChild(button);
+			} else if (ribbonContainer.ribbonSettingEl) {
+				ribbonContainer.ribbonSettingEl.appendChild(button);
+			} else {
+				// 尝试找到正确的容器
+				try {
+					const container = (ribbonContainer as any).children?.[0] || ribbonContainer;
+					container.appendChild(button);
+				} catch (e) {
+					console.warn('Could not find ribbon container:', e);
+				}
+			}
 			return button;
 		} catch (error) {
 			console.warn('Failed to create ribbon button:', error);
@@ -221,10 +290,88 @@ export class ButtonManager {
 	 * 处理按钮重新排序
 	 */
 	private handleReorderButtons(sourceId: string, targetId: string) {
-		const sourceIndex = parseInt(sourceId.split('-')[1]);
-		const targetIndex = parseInt(targetId.split('-')[1]);
+		// 通过存储的索引信息找到实际的数组索引
+		const sourceElement = this.ribbonMap.get(sourceId);
+		const targetElement = this.ribbonMap.get(targetId);
+		
+		if (!sourceElement || !targetElement) return;
+		
+		const sourceIndex = parseInt(sourceElement.dataset.arrayIndex || '-1');
+		const targetIndex = parseInt(targetElement.dataset.arrayIndex || '-1');
+		
+		if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return;
 
-		if (sourceIndex === targetIndex) return;
+		// 调用外部回调来处理数组重新排序
+		this.onReorderButtons(sourceIndex, targetIndex);
+	}
+
+	/**
+	 * 使分割线可拖拽
+	 */
+	private makeDividerDraggable(divider: HTMLElement, dividerId: string, arrayIndex: number) {
+		divider.setAttribute('draggable', 'true');
+		divider.classList.add('custom-ribbon-divider');
+
+		divider.addEventListener('dragstart', (e) => {
+			this.dragState.isDragging = true;
+			this.dragState.dragSource = dividerId;
+			divider.classList.add('dragging');
+			e.dataTransfer!.effectAllowed = 'move';
+			e.dataTransfer!.setData('text/plain', dividerId);
+		});
+
+		divider.addEventListener('dragend', (e) => {
+			this.dragState.isDragging = false;
+			this.dragState.dragSource = null;
+			divider.classList.remove('dragging');
+			document.querySelectorAll('.custom-ribbon-divider.drag-over').forEach(el => {
+				(el as HTMLElement).classList.remove('drag-over');
+			});
+		});
+
+		divider.addEventListener('dragover', (e) => {
+			if (this.dragState.isDragging && this.dragState.dragSource !== dividerId) {
+				e.preventDefault();
+				e.dataTransfer!.dropEffect = 'move';
+				divider.classList.add('drag-over');
+			}
+		});
+
+		divider.addEventListener('dragenter', (e) => {
+			if (this.dragState.isDragging && this.dragState.dragSource !== dividerId) {
+				e.preventDefault();
+				divider.classList.add('drag-over');
+			}
+		});
+
+		divider.addEventListener('dragleave', (e) => {
+			divider.classList.remove('drag-over');
+		});
+
+		divider.addEventListener('drop', (e) => {
+			e.preventDefault();
+			divider.classList.remove('drag-over');
+
+			if (this.dragState.isDragging && this.dragState.dragSource && this.dragState.dragSource !== dividerId) {
+				this.handleReorderDividers(this.dragState.dragSource, dividerId);
+			}
+		});
+	}
+
+	/**
+	 * 处理分割线重新排序
+	 */
+	private handleReorderDividers(sourceId: string, targetId: string) {
+		// 通过存储的索引信息找到实际的数组索引
+		const sourceElement = this.ribbonMap.get(sourceId);
+		const targetElement = this.ribbonMap.get(targetId);
+		
+		if (!sourceElement || !targetElement) return;
+		
+		const sourceIndex = parseInt(sourceElement.dataset.arrayIndex || '-1');
+		const targetIndex = parseInt(targetElement.dataset.arrayIndex || '-1');
+		
+		if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return;
 
 		// 调用外部回调来处理数组重新排序
 		this.onReorderButtons(sourceIndex, targetIndex);
@@ -310,38 +457,76 @@ export class ButtonManager {
 	/**
 	 * 应用样式设置
 	 */
-	applyStyleSettings() {
-		const styles = [
-			{ id: 'vault-profile', css: `
-				body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile {
-					display: none;
-				}
-			` },
-			{ id: 'vault-switcher', css: `
-				body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-switcher {
-					display: none;
-				}
-			` },
-			{ id: 'vault-actions-help', css: `
-				body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.help) {
-					display: none;
-				}
-			` },
-			{ id: 'vault-actions-settings', css: `
-				body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.lucide-settings) {
-					display: none;
-				}
-			` },
-			{ id: 'vault-actions-theme', css: `
-				body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.lucide-sun-moon) {
-					display: none;
-				}
-			` }
-		];
+	applyStyleSettings(hideBuiltInButtons: boolean = true) {
+		if (hideBuiltInButtons) {
+			// 隐藏内置按钮时应用样式
+			const styles = [
+				{ id: 'vault-profile', css: `
+					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile {
+						display: none;
+					}
+				` },
+				{ id: 'vault-switcher', css: `
+					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-switcher {
+						display: none;
+					}
+				` },
+				{ id: 'vault-actions-help', css: `
+					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.help) {
+						display: none;
+					}
+				` },
+				{ id: 'vault-actions-settings', css: `
+					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.lucide-settings) {
+						display: none;
+					}
+				` },
+				{ id: 'vault-actions-theme', css: `
+					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.lucide-sun-moon) {
+						display: none;
+					}
+				` }
+			];
 
-		styles.forEach(({ id, css }) => {
-			this.updateStyle(id, css);
-		});
+			styles.forEach(({ id, css }) => {
+				this.updateStyle(id, css);
+			});
+		} else {
+			// 显示内置按钮时移除所有样式，让原生样式生效
+			const styleIds = ['vault-profile', 'vault-switcher', 'vault-actions-help', 'vault-actions-settings', 'vault-actions-theme'];
+			styleIds.forEach(id => {
+				this.removeStyle(id);
+			});
+		}
+	}
+
+	/**
+	 * 应用默认功能区样式设置
+	 */
+	applyDefaultActionsStyle(hideDefaultActions: boolean = false) {
+		if (hideDefaultActions) {
+			// 隐藏默认功能区时应用样式
+			const css = `
+				.side-dock-actions {
+					display: none !important;
+				}
+			`;
+			this.updateStyle('default-actions', css);
+		} else {
+			// 显示默认功能区时移除样式
+			this.removeStyle('default-actions');
+		}
+	}
+
+	/**
+	 * 移除样式
+	 */
+	private removeStyle(id: string) {
+		const styleEl = this.styleElements[id];
+		if (styleEl) {
+			styleEl.remove();
+			delete this.styleElements[id];
+		}
 	}
 
 	/**
