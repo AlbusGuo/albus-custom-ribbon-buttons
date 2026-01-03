@@ -1,4 +1,4 @@
-# Ribbon Vault Buttons - Obsidian 插件
+# Custom Ribbon Buttons - Obsidian 插件
 
 ![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Plugin-blue?logo=obsidian)
 ![Version](https://img.shields.io/badge/Version-0.1.0-green)
