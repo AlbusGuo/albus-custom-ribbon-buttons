@@ -1,4 +1,4 @@
-import { App, TFile } from 'obsidian';
+import { App, TFile, setIcon } from 'obsidian';
 import { CustomButton, BuiltInButton, DragState, ButtonItem, DividerItem } from '../types';
 
 /**
@@ -12,6 +12,10 @@ export class ButtonManager {
 		isDragging: false,
 		dragSource: null
 	};
+	// 跟踪每个按钮的图标切换状态：true表示显示切换图标，false表示显示主图标
+	private toggleStates = new Map<string, boolean>();
+	// 存储按钮配置
+	private buttonConfigs = new Map<string, CustomButton>();
 
 	constructor(
 		private app: App,
@@ -40,6 +44,8 @@ export class ButtonManager {
 			}
 		});
 		this.ribbonMap.clear();
+		this.toggleStates.clear();
+		this.buttonConfigs.clear();
 	}
 
 	/**
@@ -93,7 +99,18 @@ export class ButtonManager {
 	 */
 	createCustomButton(button: CustomButton, index: number) {
 		const buttonId = `custom-${index}`;
+		
+		// 存储按钮配置
+		this.buttonConfigs.set(buttonId, button);
+		
+		// 初始化切换状态为false（显示主图标）
+		this.toggleStates.set(buttonId, false);
+		
 		const onClick = () => {
+			// 先切换图标
+			this.toggleButtonIcon(buttonId);
+			
+			// 然后执行按钮的功能
 			this.handleButtonClick(button);
 		};
 
@@ -165,6 +182,35 @@ export class ButtonManager {
 				}
 				break;
 		}
+	}
+
+	/**
+	 * 切换按钮图标
+	 */
+	private toggleButtonIcon(buttonId: string) {
+		const buttonEl = this.ribbonMap.get(buttonId);
+		const buttonConfig = this.buttonConfigs.get(buttonId);
+		
+		if (!buttonEl || !buttonConfig) return;
+
+		// 获取当前切换状态
+		const currentState = this.toggleStates.get(buttonId) || false;
+		// 切换状态
+		const newState = !currentState;
+		this.toggleStates.set(buttonId, newState);
+
+		// 根据新状态选择图标
+		const newIcon = newState ? (buttonConfig.toggleIcon || buttonConfig.icon) : buttonConfig.icon;
+
+		// 直接查找并更新 SVG 元素
+		const svgEl = buttonEl.querySelector('svg');
+		if (svgEl) {
+			// 移除旧的 SVG
+			svgEl.remove();
+		}
+		
+		// 使用 setIcon 添加新图标
+		setIcon(buttonEl, newIcon);
 	}
 
 	/**

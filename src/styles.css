@@ -215,6 +215,8 @@
 
 /* 输入框和下拉菜单样式优化 - 紧凑版 */
 .basic-vault-button-setting-item input[type="text"],
+.basic-vault-button-setting-item input[type="url"],
+.basic-vault-button-setting-item input,
 .basic-vault-button-setting-item .dropdown {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
@@ -224,13 +226,23 @@
   transition: all 0.2s ease;
   min-height: 32px;
   width: 100%;
+  color: var(--text-normal);
 }
 
 .basic-vault-button-setting-item input[type="text"]:focus,
+.basic-vault-button-setting-item input[type="url"]:focus,
+.basic-vault-button-setting-item input:focus,
 .basic-vault-button-setting-item .dropdown:focus {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.1);
   outline: none;
+}
+
+/* 确保readOnly状态的输入框样式也一致 */
+.basic-vault-button-setting-item input[readonly] {
+  background: var(--background-primary);
+  cursor: text;
+  opacity: 1;
 }
 
 /* 命令搜索样式 */
@@ -595,4 +607,65 @@
     font-size: 11px;
     padding: 3px 8px;
   }
+}
+
+/* 拖拽功能样式 */
+.draggable-setting {
+  cursor: move;
+  transition: all 0.2s ease;
+}
+
+.draggable-setting.dragging {
+  opacity: 0.5;
+  border-color: var(--interactive-accent);
+}
+
+.draggable-setting.drag-over {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 拖拽手柄样式 */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 8px;
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0.5;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+}
+
+.drag-handle:hover {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 确保拖拽手柄在最右侧 */
+.setting-item-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.setting-item-control .drag-handle {
+  order: 9999;
+  margin-left: auto;
 }

@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: RibbonVaultButtonsSettings = {
 export function createCustomButton(): CustomButton {
 	return {
 		icon: 'lucide-plus',
+		toggleIcon: 'lucide-plus',
 		tooltip: '新按钮',
 		type: 'command',
 		command: '',

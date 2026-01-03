@@ -21,6 +21,8 @@ export interface DividerItem {
 export interface CustomButton {
 	/** 图标名称 */
 	icon: string;
+	/** 切换后的图标名称 */
+	toggleIcon: string;
 	/** 提示文字 */
 	tooltip: string;
 	/** 按钮类型 */

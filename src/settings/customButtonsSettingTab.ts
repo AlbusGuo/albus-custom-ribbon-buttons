@@ -18,6 +18,7 @@ interface RibbonVaultButtonsPlugin extends Plugin {
  */
 export class CustomButtonsSettingTab extends PluginSettingTab {
 	plugin: RibbonVaultButtonsPlugin;
+	private draggedIndex: number | null = null;
 
 	constructor(app: App, plugin: RibbonVaultButtonsPlugin) {
 		super(app, plugin);
@@ -173,8 +174,14 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 					this.plugin.initVaultButtons();
 				}));
 
-		// 添加图标选择器
-		this.addIconPicker(setting, button);
+		// 添加拖拽功能
+		this.makeDraggable(setting.settingEl, index);
+
+		// 添加主图标选择器
+		this.addIconPicker(setting, button, false);
+		
+		// 添加切换图标选择器
+		this.addIconPicker(setting, button, true);
 		
 		setting.addDropdown(dropdown => dropdown
 			.addOption('command', '命令')
@@ -186,24 +193,22 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 				this.display();
 			}))
-			.addSearch(search => {
-				search.setValue(this.getValueForType(button));
-				search.setPlaceholder(this.getPlaceholderForType(button.type));
+			.addText(text => {
+				text.setValue(this.getValueForType(button));
+				text.setPlaceholder(this.getPlaceholderForType(button.type));
 				
-				// 根据类型设置不同的输入验证
-				if (button.type === 'url') {
-					search.inputEl.type = 'url';
-				}
+				// 所有输入框都使用text类型确保样式一致
+				text.inputEl.type = 'text';
 				
 				// 为命令类型添加选择器
 				if (button.type === 'command') {
 					const modal = new CommandSuggestModal(this.app, (command) => {
 						button.command = command.id;
-						search.setValue(command.id);
+						text.setValue(command.id);
 						this.plugin.saveSettings();
 					});
 					
-					search.inputEl.addEventListener('click', () => {
+					text.inputEl.addEventListener('click', () => {
 						modal.open();
 					});
 				}
@@ -212,16 +217,16 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 				if (button.type === 'file') {
 					const modal = new FileSuggestModal(this.app, (file) => {
 						button.file = file.path;
-						search.setValue(file.path);
+						text.setValue(file.path);
 						this.plugin.saveSettings();
 					});
 					
-					search.inputEl.addEventListener('click', () => {
+					text.inputEl.addEventListener('click', () => {
 						modal.open();
 					});
 				}
 				
-				search.onChange(value => {
+				text.onChange(value => {
 					this.setValueForType(button, value);
 					this.plugin.saveSettings();
 				});
@@ -230,12 +235,15 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 				.setIcon('trash')
 				.setTooltip('删除按钮')
 				.onClick(() => this.removeButtonItem(index)));
+
+		// 在最右侧添加拖拽手柄
+		this.addDragHandle(setting);
 	}
 
 	/**
 	 * 添加图标选择器
 	 */
-	private addIconPicker(setting: Setting, button: CustomButton) {
+	private addIconPicker(setting: Setting, button: CustomButton, isToggleIcon: boolean = false) {
 		// 创建图标选择按钮
 		const iconButton = setting.controlEl.createEl('button', {
 			cls: 'icon-picker-button-compact'
@@ -255,12 +263,17 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		};
 
 		// 初始化图标显示
-		updateIconDisplay(button.icon);
+		const currentIcon = isToggleIcon ? button.toggleIcon : button.icon;
+		updateIconDisplay(currentIcon);
 
 		// 点击打开图标选择模态框
 		iconButton.addEventListener('click', () => {
 			const modal = new IconSuggestModal(this.app, async (selectedIcon: string) => {
-				button.icon = selectedIcon;
+				if (isToggleIcon) {
+					button.toggleIcon = selectedIcon;
+				} else {
+					button.icon = selectedIcon;
+				}
 				updateIconDisplay(selectedIcon);
 				await this.plugin.saveSettings();
 				this.plugin.initVaultButtons();
@@ -269,7 +282,9 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		});
 
 		// 添加工具提示
-		iconButton.title = `当前图标: ${button.icon || 'help-circle'}`;
+		const iconType = isToggleIcon ? '切换图标' : '主图标';
+		const currentIconName = isToggleIcon ? (button.toggleIcon || 'help-circle') : (button.icon || 'help-circle');
+		iconButton.title = `${iconType}: ${currentIconName}`;
 	}
 
 	/**
@@ -331,6 +346,94 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 				.setIcon('trash')
 				.setTooltip('删除分割线')
 				.onClick(() => this.removeButtonItem(index)));
+
+		// 添加拖拽功能
+		this.makeDraggable(setting.settingEl, index);
+
+		// 在最右侧添加拖拽手柄
+		this.addDragHandle(setting);
+	}
+
+	/**
+	 * 添加拖拽手柄
+	 */
+	private addDragHandle(setting: Setting) {
+		const dragHandle = setting.controlEl.createDiv({
+			cls: 'drag-handle',
+			attr: { 'aria-label': '拖拽排序' }
+		});
+		setIcon(dragHandle, 'grip-vertical');
+	}
+
+	/**
+	 * 使设置项可拖拽
+	 */
+	private makeDraggable(element: HTMLElement, index: number) {
+		element.setAttribute('draggable', 'true');
+		element.classList.add('draggable-setting');
+		element.dataset.index = index.toString();
+
+		element.addEventListener('dragstart', (e) => {
+			this.draggedIndex = index;
+			element.classList.add('dragging');
+			if (e.dataTransfer) {
+				e.dataTransfer.effectAllowed = 'move';
+				e.dataTransfer.setData('text/plain', index.toString());
+			}
+		});
+
+		element.addEventListener('dragend', () => {
+			this.draggedIndex = null;
+			element.classList.remove('dragging');
+			document.querySelectorAll('.draggable-setting.drag-over').forEach(el => {
+				el.classList.remove('drag-over');
+			});
+		});
+
+		element.addEventListener('dragover', (e) => {
+			if (this.draggedIndex !== null && this.draggedIndex !== index) {
+				e.preventDefault();
+				if (e.dataTransfer) {
+					e.dataTransfer.dropEffect = 'move';
+				}
+				element.classList.add('drag-over');
+			}
+		});
+
+		element.addEventListener('dragenter', (e) => {
+			if (this.draggedIndex !== null && this.draggedIndex !== index) {
+				e.preventDefault();
+				element.classList.add('drag-over');
+			}
+		});
+
+		element.addEventListener('dragleave', (e) => {
+			// 只在离开整个元素时移除样式
+			if (e.currentTarget === e.target || !element.contains(e.relatedTarget as Node)) {
+				element.classList.remove('drag-over');
+			}
+		});
+
+		element.addEventListener('drop', (e) => {
+			e.preventDefault();
+			element.classList.remove('drag-over');
+
+			if (this.draggedIndex !== null && this.draggedIndex !== index) {
+				this.reorderItems(this.draggedIndex, index);
+			}
+		});
+	}
+
+	/**
+	 * 重新排序项目
+	 */
+	private reorderItems(fromIndex: number, toIndex: number) {
+		const items = this.plugin.settings.buttonItems;
+		const [movedItem] = items.splice(fromIndex, 1);
+		items.splice(toIndex, 0, movedItem);
+		this.plugin.saveSettings();
+		this.plugin.initVaultButtons();
+		this.display();
 	}
 
 	

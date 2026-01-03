@@ -387,6 +387,13 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	 */
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		
+		// 兼容性处理：为没有 toggleIcon 的旧按钮添加默认值
+		this.settings.buttonItems.forEach((item) => {
+			if (item.type !== 'divider' && !(item as any).toggleIcon) {
+				(item as any).toggleIcon = (item as any).icon;
+			}
+		});
 	}
 
 	/**
