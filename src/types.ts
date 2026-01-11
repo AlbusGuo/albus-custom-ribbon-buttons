@@ -33,6 +33,8 @@ export interface CustomButton {
 	file: string;
 	/** 网址 */
 	url: string;
+	/** 图标显示状态：true表示显示切换图标，false或undefined表示显示主图标 */
+	iconState?: boolean;
 }
 
 /**

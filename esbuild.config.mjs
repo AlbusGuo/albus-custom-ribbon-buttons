@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { fileInliner } from "./build/file-inliner.mjs";
 
 const banner =
 `/*
@@ -10,6 +11,20 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const prod = (process.argv[2] === "production");
+
+// inline files into CSS
+const fileInlinerPlugin = {
+	name: 'file-inliner-plugin',
+	setup(build) {
+	  build.onEnd(async () => {
+		try {
+			await fileInliner('src/Styles/styles.css', 'styles.css');
+		} catch {
+			process.exit(1);
+		}
+	  });
+	},
+};
 
 const context = await esbuild.context({
 	banner: {
@@ -33,15 +48,13 @@ const context = await esbuild.context({
 		"@lezer/lr",
 		...builtins],
 	format: "cjs",
-	target: "es2018",
+	target: "ES2022",
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
-	loader: {
-		".css": "text",
-	},
+	plugins: [fileInlinerPlugin],
 });
 
 if (prod) {

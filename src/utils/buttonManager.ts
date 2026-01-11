@@ -103,8 +103,12 @@ export class ButtonManager {
 		// 存储按钮配置
 		this.buttonConfigs.set(buttonId, button);
 		
-		// 初始化切换状态为false（显示主图标）
-		this.toggleStates.set(buttonId, false);
+		// 从settings恢复图标状态，默认为false（显示主图标）
+		const savedState = button.iconState || false;
+		this.toggleStates.set(buttonId, savedState);
+		
+		// 根据保存的状态选择初始图标
+		const initialIcon = savedState ? (button.toggleIcon || button.icon) : button.icon;
 		
 		const onClick = () => {
 			// 先切换图标
@@ -114,7 +118,7 @@ export class ButtonManager {
 			this.handleButtonClick(button);
 		};
 
-		return this.createRibbonButton(buttonId, button.tooltip, button.icon, onClick, true, index);
+		return this.createRibbonButton(buttonId, button.tooltip, initialIcon, onClick, true, index);
 	}
 
 	/**
@@ -198,6 +202,11 @@ export class ButtonManager {
 		// 切换状态
 		const newState = !currentState;
 		this.toggleStates.set(buttonId, newState);
+		
+		// 保存状态到按钮配置
+		buttonConfig.iconState = newState;
+		// 触发设置保存
+		this.onSettingsChange();
 
 		// 根据新状态选择图标
 		const newIcon = newState ? (buttonConfig.toggleIcon || buttonConfig.icon) : buttonConfig.icon;

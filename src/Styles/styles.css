@@ -1,0 +1,5 @@
+/* NOTE: make any modifications to this file in src/Styles/styles.css */
+
+@import "./settings.css";
+@import "./buttons.css";
+@import "./dragging.css";

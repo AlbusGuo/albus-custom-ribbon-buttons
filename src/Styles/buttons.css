@@ -1,0 +1,78 @@
+/* 按钮相关样式 */
+
+/* 紧凑型图标选择器样式 */
+.icon-picker-button-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.icon-picker-button-compact:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.icon-picker-preview-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-normal);
+}
+
+.icon-picker-preview-compact svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 自定义功能区按钮样式 */
+.custom-ribbon-button {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.custom-ribbon-button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* 分割线样式 */
+.custom-ribbon-divider {
+  position: relative;
+  margin: 4px 0;
+  flex-shrink: 0;
+  width: 100%;
+  height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-ribbon-divider::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background-color: var(--divider-color);
+  opacity: 0.5;
+}
+
+.custom-ribbon-divider:hover::before {
+  opacity: 1;
+  background-color: var(--divider-color);
+}
+
+/* 拖拽时的视觉提示 */
+.custom-ribbon-divider:hover {
+  background-color: var(--background-modifier-hover);
+  border-radius: 2px;
+}

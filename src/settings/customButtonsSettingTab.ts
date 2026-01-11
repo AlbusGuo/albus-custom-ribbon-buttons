@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Plugin, setIcon } from 'obsidian';
+import { App, PluginSettingTab, Setting, Plugin, setIcon, SettingGroup } from 'obsidian';
 import { CustomButton, ButtonItem, DividerItem } from '../types';
 import { createCustomButton, createDivider } from '../settings';
 import { FileSuggestModal } from '../modals/fileSuggestModal';
@@ -20,6 +20,8 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	plugin: RibbonVaultButtonsPlugin;
 	private draggedIndex: number | null = null;
 
+	icon: string = 'panel-left';
+
 	constructor(app: App, plugin: RibbonVaultButtonsPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
@@ -29,7 +31,11 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
+		// 创建全局设置分组
 		this.createGlobalSettings(containerEl);
+
+		// 创建按钮列表标题
+		containerEl.createEl('h3', { text: '自定义按钮列表' });
 
 		if (this.plugin.settings.buttonItems.length === 0) {
 			this.createEmptyState(containerEl);
@@ -43,34 +49,38 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	
 
 	/**
-	 * 创建全局设置
+	 * 创建全局设置 - 使用 SettingGroup (Note Toolbar 风格)
 	 */
 	private createGlobalSettings(containerEl: HTMLElement) {
-		new Setting(containerEl)
-			.setName('调整内置按钮到左侧功能区')
-			.setDesc('开启后将 Obsidian 原生的库切换、设置、帮助等按钮布局调整到左侧功能区')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.hideBuiltInButtons)
-				.onChange(async (value) => {
-					this.plugin.settings.hideBuiltInButtons = value;
-					await this.plugin.saveSettings();
-					// 重新应用样式设置
-					this.plugin.buttonManager.applyStyleSettings(value);
-					// 重新初始化按钮以显示/隐藏我们的替代按钮
-					this.plugin.initVaultButtons();
-				}));
+		// 使用 SettingGroup 创建设置组（完全按照 Note Toolbar）
+		const settingsGroup = new SettingGroup(containerEl);
 
-		new Setting(containerEl)
-			.setName('隐藏默认功能区')
-			.setDesc('开启后将隐藏 Obsidian 的默认功能区')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.hideDefaultActions)
-				.onChange(async (value) => {
-					this.plugin.settings.hideDefaultActions = value;
-					await this.plugin.saveSettings();
-					// 应用或移除默认功能区隐藏样式
-					this.plugin.buttonManager.applyDefaultActionsStyle(value);
-				}));
+		settingsGroup.addSetting((setting) => {
+			setting
+				.setName('调整内置按钮到左侧功能区')
+				.setDesc('开启后将 Obsidian 原生的库切换、设置、帮助等按钮布局调整到左侧功能区')
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.hideBuiltInButtons)
+					.onChange(async (value) => {
+						this.plugin.settings.hideBuiltInButtons = value;
+						await this.plugin.saveSettings();
+						this.plugin.buttonManager.applyStyleSettings(value);
+						this.plugin.initVaultButtons();
+					}));
+		});
+
+		settingsGroup.addSetting((setting) => {
+			setting
+				.setName('隐藏默认功能区')
+				.setDesc('开启后将隐藏 Obsidian 的默认功能区')
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.hideDefaultActions)
+					.onChange(async (value) => {
+						this.plugin.settings.hideDefaultActions = value;
+						await this.plugin.saveSettings();
+						this.plugin.buttonManager.applyDefaultActionsStyle(value);
+					}));
+		});
 	}
 
 	/**
@@ -89,8 +99,8 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	 * 创建按钮列表
 	 */
 	private createButtonsList(containerEl: HTMLElement) {
-		// 创建容器用于应用紧凑样式
-		const buttonsContainer = containerEl.createDiv('basic-vault-button-container');
+		// 创建按钮列表容器，应用 Note Toolbar 风格
+		const buttonsContainer = containerEl.createDiv('basic-vault-button-list');
 
 		this.plugin.settings.buttonItems.forEach((item, index) => {
 			if (item.type === 'divider') {
@@ -237,7 +247,7 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 				.onClick(() => this.removeButtonItem(index)));
 
 		// 在最右侧添加拖拽手柄
-		this.addDragHandle(setting);
+		this.addDragHandle(setting, index);
 	}
 
 	/**
@@ -351,25 +361,37 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		this.makeDraggable(setting.settingEl, index);
 
 		// 在最右侧添加拖拽手柄
-		this.addDragHandle(setting);
+		this.addDragHandle(setting, index);
 	}
 
 	/**
 	 * 添加拖拽手柄
 	 */
-	private addDragHandle(setting: Setting) {
+	private addDragHandle(setting: Setting, index: number) {
 		const dragHandle = setting.controlEl.createDiv({
 			cls: 'drag-handle',
 			attr: { 'aria-label': '拖拽排序' }
 		});
 		setIcon(dragHandle, 'grip-vertical');
+		
+		// 只允许拖拽手柄触发拖拽
+		dragHandle.addEventListener('mousedown', (e) => {
+			const settingEl = setting.settingEl;
+			settingEl.setAttribute('draggable', 'true');
+		});
+		
+		dragHandle.addEventListener('mouseup', (e) => {
+			const settingEl = setting.settingEl;
+			settingEl.setAttribute('draggable', 'false');
+		});
 	}
 
 	/**
 	 * 使设置项可拖拽
 	 */
 	private makeDraggable(element: HTMLElement, index: number) {
-		element.setAttribute('draggable', 'true');
+		// 默认不可拖拽，只有通过拖拽手柄才能拖拽
+		element.setAttribute('draggable', 'false');
 		element.classList.add('draggable-setting');
 		element.dataset.index = index.toString();
 
