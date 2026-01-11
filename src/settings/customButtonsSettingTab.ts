@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Plugin, setIcon, SettingGroup } from 'obsidian';
+import { App, PluginSettingTab, Setting, Plugin, setIcon, setTooltip, SettingGroup } from 'obsidian';
 import { CustomButton, ButtonItem, DividerItem } from '../types';
 import { createCustomButton, createDivider } from '../settings';
 import { FileSuggestModal } from '../modals/fileSuggestModal';
@@ -246,8 +246,17 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 				.setTooltip('删除按钮')
 				.onClick(() => this.removeButtonItem(index)));
 
-		// 在最右侧添加拖拽手柄
-		this.addDragHandle(setting, index);
+		// 创建操作按钮容器，包装删除按钮和拖拽手柄
+		const actionButtonsContainer = setting.controlEl.createDiv({ cls: 'action-buttons' });
+		
+		// 将删除按钮移动到操作容器中
+		const deleteButton = setting.controlEl.querySelector('.setting-item-extra-button');
+		if (deleteButton) {
+			actionButtonsContainer.appendChild(deleteButton);
+		}
+		
+		// 在操作容器中添加拖拽手柄
+		this.addDragHandleToContainer(actionButtonsContainer, setting, index);
 	}
 
 	/**
@@ -291,10 +300,10 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 			modal.open();
 		});
 
-		// 添加工具提示
+		// 使用 Obsidian 的 setTooltip
 		const iconType = isToggleIcon ? '切换图标' : '主图标';
 		const currentIconName = isToggleIcon ? (button.toggleIcon || 'help-circle') : (button.icon || 'help-circle');
-		iconButton.title = `${iconType}: ${currentIconName}`;
+		setTooltip(iconButton, `${iconType}: ${currentIconName}`);
 	}
 
 	/**
@@ -360,15 +369,24 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		// 添加拖拽功能
 		this.makeDraggable(setting.settingEl, index);
 
-		// 在最右侧添加拖拽手柄
-		this.addDragHandle(setting, index);
+		// 创建操作按钮容器
+		const actionButtonsContainer = setting.controlEl.createDiv({ cls: 'action-buttons' });
+		
+		// 将删除按钮移动到操作容器中
+		const deleteButton = setting.controlEl.querySelector('.setting-item-extra-button');
+		if (deleteButton) {
+			actionButtonsContainer.appendChild(deleteButton);
+		}
+		
+		// 在操作容器中添加拖拽手柄
+		this.addDragHandleToContainer(actionButtonsContainer, setting, index);
 	}
 
 	/**
-	 * 添加拖拽手柄
+	 * 添加拖拽手柄到指定容器
 	 */
-	private addDragHandle(setting: Setting, index: number) {
-		const dragHandle = setting.controlEl.createDiv({
+	private addDragHandleToContainer(container: HTMLElement, setting: Setting, index: number) {
+		const dragHandle = container.createDiv({
 			cls: 'drag-handle',
 			attr: { 'aria-label': '拖拽排序' }
 		});
@@ -384,6 +402,13 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 			const settingEl = setting.settingEl;
 			settingEl.setAttribute('draggable', 'false');
 		});
+	}
+
+	/**
+	 * 添加拖拽手柄（已弃用，使用 addDragHandleToContainer 替代）
+	 */
+	private addDragHandle(setting: Setting, index: number) {
+		this.addDragHandleToContainer(setting.controlEl, setting, index);
 	}
 
 	/**

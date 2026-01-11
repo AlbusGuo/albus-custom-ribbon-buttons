@@ -163,6 +163,8 @@
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .basic-vault-button-container .setting-item-control input[type="text"],
@@ -171,36 +173,226 @@
   max-width: 150px;
   font-size: 12px;
   padding: 4px 6px;
+  flex-shrink: 1;
 }
 
 .basic-vault-button-container .setting-item-control .dropdown {
   min-width: 80px;
   max-width: 100px;
+  flex-shrink: 0;
+}
+
+/* 图标选择器按钮样式 */
+.icon-picker-button-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.icon-picker-button-compact:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.icon-picker-preview-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-normal);
+}
+
+/* 设置项整体布局 */
+.basic-vault-button-list .setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.basic-vault-button-list .setting-item .setting-item-info {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.basic-vault-button-list .setting-item .setting-item-control {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 拖拽手柄和删除按钮容器 */
+.basic-vault-button-list .setting-item .setting-item-control .action-buttons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* 删除按钮样式 */
 .basic-vault-button-container .setting-item-extra-button {
   color: var(--color-red);
   margin-left: 4px;
+  flex-shrink: 0;
 }
 
 .basic-vault-button-container .setting-item-extra-button:hover {
   color: var(--color-red-dark);
 }
 
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .basic-vault-button-container .setting-item-control {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
+/* 设置项名称输入框样式 */
+.basic-vault-button-list .setting-item .setting-item-info input[type="text"] {
+  min-width: 100px;
+  max-width: 200px;
+  font-size: 13px;
+}
+
+/* 控件组内的输入框和下拉框样式优化 */
+.basic-vault-button-list .setting-item .setting-item-control > * {
+  flex-shrink: 0;
+}
+
+/* 确保输入框在换行时不会过度压缩 */
+.basic-vault-button-list .setting-item .setting-item-control input[type="text"] {
+  flex: 1 1 auto;
+}
+
+/* 下拉框固定宽度 */
+.basic-vault-button-list .setting-item .setting-item-control select {
+  flex: 0 0 auto;
+}
+
+/* 图标选择器固定宽度 */
+.basic-vault-button-list .setting-item .setting-item-control .icon-picker-button-compact {
+  flex: 0 0 auto;
+}
+
+/* 操作按钮组（删除、拖拽） */
+.basic-vault-button-list .setting-item .setting-item-control .action-buttons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+/* 拖拽手柄样式优化 */
+.basic-vault-button-list .setting-item .drag-handle {
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+/* 确保控件容器有足够的空间 */
+.basic-vault-button-list .setting-item .setting-item-control {
+  min-width: 0;
+  overflow: visible;
+}
+
+/* 输入框和下拉框的响应式宽度 */
+.basic-vault-button-list .setting-item .setting-item-control > *:not(.action-buttons):not(.icon-picker-button-compact) {
+  flex: 1 1 auto;
+  min-width: 80px;
+}
+
+/* 在中等屏幕上优化控件宽度 */
+@media (min-width: 601px) and (max-width: 900px) {
+  .basic-vault-button-list .setting-item .setting-item-control input[type="text"] {
+    flex: 1 1 120px;
   }
   
-  .basic-vault-button-container .setting-item-control input[type="text"],
-  .basic-vault-button-container .setting-item-control select,
-  .basic-vault-button-container .setting-item-control .dropdown {
+  .basic-vault-button-list .setting-item .setting-item-control select {
+    flex: 0 0 80px;
+  }
+}
+
+/* 在大屏幕上保持紧凑布局 */
+@media (min-width: 901px) {
+  .basic-vault-button-list .setting-item .setting-item-control {
+    flex-wrap: nowrap;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control input[type="text"] {
+    flex: 1 1 120px;
+    max-width: 150px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control select {
+    flex: 0 0 80px;
+    max-width: 100px;
+  }
+}
+
+/* 拖拽状态样式 */
+.basic-vault-button-list .setting-item.dragging {
+  opacity: 0.5;
+  background: var(--background-modifier-hover);
+}
+
+.basic-vault-button-list .setting-item.drag-over {
+  border-top: 2px solid var(--interactive-accent);
+}
+
+/* 确保设置项在拖拽时保持布局稳定 */
+.basic-vault-button-list .setting-item {
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+/* 响应式调整 */
+@media (max-width: 900px) {
+  /* 中等屏幕：控件开始换行 */
+  .basic-vault-button-list .setting-item .setting-item-control {
+    flex-wrap: wrap;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control input[type="text"],
+  .basic-vault-button-list .setting-item .setting-item-control select {
+    min-width: 100px;
+    max-width: 140px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control .dropdown {
+    min-width: 70px;
+    max-width: 90px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* 小屏幕：完全换行布局 */
+  .basic-vault-button-list .setting-item {
+    padding: 12px 8px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control input[type="text"],
+  .basic-vault-button-list .setting-item .setting-item-control select,
+  .basic-vault-button-list .setting-item .setting-item-control .dropdown {
     max-width: 100%;
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 80px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control .icon-picker-button-compact {
+    flex: 0 0 auto;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control .action-buttons {
+    margin-left: 0;
+    flex: 0 0 auto;
   }
   
   .basic-vault-button-add-container {
@@ -215,6 +407,60 @@
   .basic-vault-button-empty {
     padding: 24px 16px;
     margin: 12px 0;
+  }
+}
+
+@media (max-width: 600px) {
+  /* 超小屏幕：更紧凑的布局 */
+  .basic-vault-button-list .setting-item {
+    padding: 10px 6px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control {
+    gap: 6px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control input[type="text"],
+  .basic-vault-button-list .setting-item .setting-item-control select {
+    font-size: 11px;
+    padding: 3px 5px;
+    min-width: 70px;
+  }
+  
+  .icon-picker-button-compact {
+    min-width: 28px;
+    width: 28px;
+    height: 28px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-info .setting-item-name {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 极小屏幕：垂直堆叠 */
+  .basic-vault-button-list .setting-item .setting-item-control {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control input[type="text"],
+  .basic-vault-button-list .setting-item .setting-item-control select,
+  .basic-vault-button-list .setting-item .setting-item-control .dropdown {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control .icon-picker-button-compact {
+    width: 100%;
+    height: 36px;
+  }
+  
+  .basic-vault-button-list .setting-item .setting-item-control .action-buttons {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 4px;
   }
 }
 
