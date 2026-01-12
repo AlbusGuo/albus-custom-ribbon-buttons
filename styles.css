@@ -14,6 +14,17 @@
   font-weight: 600;
 }
 
+/* 按钮列表容器 - 参考 Note Toolbar */
+.basic-vault-button-list-container {
+  padding-top: 0.75em;
+}
+
+.basic-vault-button-list-container .setting-item-heading {
+  padding-left: 0;
+  padding-right: 0;
+  margin-bottom: 1em;
+}
+
 /* 添加按钮容器样式 */
 .basic-vault-button-add-container {
   display: flex;
@@ -94,7 +105,6 @@
 }
 
 .basic-vault-button-list .setting-item:focus-within {
-  outline: solid 2px var(--background-modifier-border-focus);
   border-radius: var(--radius-m);
 }
 

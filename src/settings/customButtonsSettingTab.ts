@@ -34,16 +34,19 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		// 创建全局设置分组
 		this.createGlobalSettings(containerEl);
 
-		// 创建按钮列表标题
-		containerEl.createEl('h3', { text: '自定义按钮列表' });
+		// 创建按钮列表标题 - 参考 Note Toolbar 的方式
+		const buttonListContainer = containerEl.createDiv('basic-vault-button-list-container');
+		new Setting(buttonListContainer)
+			.setName('自定义按钮列表')
+			.setHeading();
 
 		if (this.plugin.settings.buttonItems.length === 0) {
-			this.createEmptyState(containerEl);
+			this.createEmptyState(buttonListContainer);
 		} else {
-			this.createButtonsList(containerEl);
+			this.createButtonsList(buttonListContainer);
 		}
 
-		this.createAddButtons(containerEl);
+		this.createAddButtons(buttonListContainer);
 	}
 
 	
@@ -86,8 +89,8 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	/**
 	 * 创建空状态提示
 	 */
-	private createEmptyState(containerEl: HTMLElement) {
-		const emptyState = containerEl.createDiv('basic-vault-button-empty');
+	private createEmptyState(parentEl: HTMLElement) {
+		const emptyState = parentEl.createDiv('basic-vault-button-empty');
 		emptyState.createEl('p', { text: '还没有添加任何自定义按钮' });
 		emptyState.createEl('p', {
 			text: '点击下方的"添加新按钮"开始创建',
@@ -98,9 +101,9 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	/**
 	 * 创建按钮列表
 	 */
-	private createButtonsList(containerEl: HTMLElement) {
+	private createButtonsList(parentEl: HTMLElement) {
 		// 创建按钮列表容器，应用 Note Toolbar 风格
-		const buttonsContainer = containerEl.createDiv('basic-vault-button-list');
+		const buttonsContainer = parentEl.createDiv('basic-vault-button-list');
 
 		this.plugin.settings.buttonItems.forEach((item, index) => {
 			if (item.type === 'divider') {
