@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: center;
   min-width: 32px;
+  width: 32px;
   height: 28px;
   padding: 4px;
   border: 1px solid var(--background-modifier-border);
@@ -14,6 +15,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .icon-picker-button-compact:hover {

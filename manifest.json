@@ -1,7 +1,7 @@
 {
 	"id": "albus-custom-ribbon-buttons",
 	"name": "Custom Ribbon Buttons",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"minAppVersion": "1.11.0",
 	"description": "改变库按钮的基本布局, 且支持添加自定义功能按钮.",
 	"author": "Albus",
