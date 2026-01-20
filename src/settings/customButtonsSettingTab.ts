@@ -1,16 +1,23 @@
 import { App, PluginSettingTab, Setting, Plugin, setIcon, setTooltip, SettingGroup } from 'obsidian';
-import { CustomButton, ButtonItem, DividerItem } from '../types';
+import { CustomButton, ButtonItem, DividerItem, CustomIcon } from '../types';
 import { createCustomButton, createDivider } from '../settings';
 import { FileSuggestModal } from '../modals/fileSuggestModal';
 import { CommandSuggestModal } from '../modals/commandSuggestModal';
 import { IconSuggestModal } from '../modals/iconSuggestModal';
+import { CustomIconManager } from '../utils/customIconManager';
 
 // 前向声明主类
 interface RibbonVaultButtonsPlugin extends Plugin {
-	settings: { buttonItems: ButtonItem[]; hideBuiltInButtons: boolean; hideDefaultActions: boolean };
+	settings: { 
+		buttonItems: ButtonItem[]; 
+		hideBuiltInButtons: boolean; 
+		hideDefaultActions: boolean;
+		customIcons: CustomIcon[];
+	};
 	saveSettings(): Promise<void>;
 	initVaultButtons(): void;
 	buttonManager: any;
+	customIconManager: CustomIconManager;
 }
 
 /**
@@ -272,10 +279,20 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		// 更新图标预览的函数
 		const updateIconDisplay = (iconName: string) => {
 			iconPreview.empty();
-			try {
-				setIcon(iconPreview, iconName || 'help-circle');
-			} catch (error) {
-				iconPreview.setText('?');
+			
+			// 检查是否是自定义图标
+			if (iconName && iconName.startsWith('custom:')) {
+				const customIconId = iconName.substring(7);
+				const rendered = this.plugin.customIconManager.renderIcon(customIconId, iconPreview);
+				if (!rendered) {
+					iconPreview.setText('?');
+				}
+			} else {
+				try {
+					setIcon(iconPreview, iconName || 'help-circle');
+				} catch (error) {
+					iconPreview.setText('?');
+				}
 			}
 		};
 
@@ -285,16 +302,42 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 
 		// 点击打开图标选择模态框
 		iconButton.addEventListener('click', () => {
-			const modal = new IconSuggestModal(this.app, async (selectedIcon: string) => {
-				if (isToggleIcon) {
-					button.toggleIcon = selectedIcon;
-				} else {
-					button.icon = selectedIcon;
+			const modal = new IconSuggestModal(
+				this.app, 
+				async (selectedIcon: string) => {
+					if (isToggleIcon) {
+						button.toggleIcon = selectedIcon;
+					} else {
+						button.icon = selectedIcon;
+					}
+					updateIconDisplay(selectedIcon);
+					await this.plugin.saveSettings();
+					this.plugin.initVaultButtons();
+				},
+				async (customIcons: CustomIcon[]) => {
+					// 保存自定义图标的回调
+					const existingIds = new Set(this.plugin.settings.customIcons.map(icon => icon.id));
+					const newIcons = customIcons.filter(icon => !existingIds.has(icon.id));
+					
+					if (newIcons.length > 0) {
+						this.plugin.settings.customIcons.push(...newIcons);
+						await this.plugin.saveSettings();
+						
+						// 更新自定义图标管理器
+						this.plugin.customIconManager.loadIcons(this.plugin.settings.customIcons);
+					}
+				},
+				async (iconId: string) => {
+					// 删除自定义图标的回调
+					this.plugin.settings.customIcons = this.plugin.settings.customIcons.filter(
+						icon => icon.id !== iconId
+					);
+					await this.plugin.saveSettings();
+					
+					// 更新自定义图标管理器
+					this.plugin.customIconManager.loadIcons(this.plugin.settings.customIcons);
 				}
-				updateIconDisplay(selectedIcon);
-				await this.plugin.saveSettings();
-				this.plugin.initVaultButtons();
-			});
+			);
 			modal.open();
 		});
 

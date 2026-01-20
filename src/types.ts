@@ -52,6 +52,8 @@ export interface RibbonVaultButtonsSettings {
 	hideBuiltInButtons: boolean;
 	/** 是否隐藏默认功能区 */
 	hideDefaultActions: boolean;
+	/** 自定义图标库 */
+	customIcons: CustomIcon[];
 }
 
 /**
@@ -78,4 +80,14 @@ export interface DragState {
 	isDragging: boolean;
 	/** 拖拽源按钮ID */
 	dragSource: string | null;
+}
+
+/**
+ * 自定义图标
+ */
+export interface CustomIcon {
+	/** 图标ID */
+	id: string;
+	/** SVG内容 */
+	content: string;
 }

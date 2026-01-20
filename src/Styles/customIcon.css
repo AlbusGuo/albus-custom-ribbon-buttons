@@ -1,0 +1,149 @@
+/* 文件选择按钮容器 */
+.custom-icon-file-select {
+	margin-bottom: 16px;
+	text-align: center;
+}
+
+/* 自定义图标管理模态框 */
+.custom-icon-manager-modal .modal-content {
+	max-width: 600px;
+	max-height: 70vh;
+}
+
+.custom-icon-manager-content {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 50vh;
+	overflow-y: auto;
+	padding: 8px 0;
+}
+
+.custom-icon-manager-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background-color 0.2s;
+}
+
+.custom-icon-manager-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.custom-icon-add-option {
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 8px;
+	padding-bottom: 12px;
+}
+
+.custom-icon-manager-name {
+	flex: 1;
+	font-size: 0.9em;
+}
+
+.custom-icon-manager-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.custom-icon-manager-preview {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.custom-icon-delete-btn {
+	opacity: 0.6;
+	transition: opacity 0.2s, color 0.2s;
+	background: transparent;
+	border: none;
+	padding: 4px;
+	cursor: pointer;
+}
+
+.custom-icon-delete-btn:hover {
+	opacity: 1;
+	color: var(--text-error);
+}
+
+.custom-icon-manager-item .custom-icon-empty-state {
+	text-align: center;
+	color: var(--text-muted);
+	padding: 32px;
+	font-style: italic;
+}
+
+/* 文件列表样式 */
+.custom-icon-file-list {
+	margin-top: 16px;
+	padding: 12px;
+	background-color: var(--background-secondary);
+	border-radius: 4px;
+	min-height: 60px;
+}
+
+.custom-icon-file-count {
+	font-weight: 500;
+	margin-bottom: 8px;
+	color: var(--text-normal);
+}
+
+.custom-icon-files {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.custom-icon-file-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 8px;
+	background-color: var(--background-primary);
+	border-radius: 3px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.custom-icon-file-name {
+	flex: 1;
+	font-size: 0.9em;
+	color: var(--text-normal);
+}
+
+.custom-icon-file-remove {
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 1.2em;
+	padding: 0 6px;
+	line-height: 1;
+	transition: color 0.2s;
+}
+
+.custom-icon-file-remove:hover {
+	color: var(--text-error);
+}
+
+.custom-icon-empty-state {
+	text-align: center;
+	color: var(--text-muted);
+	padding: 20px;
+	font-style: italic;
+}
+
+/* 确保模态框按钮容器样式 */
+.modal-button-container {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid var(--background-modifier-border);
+}

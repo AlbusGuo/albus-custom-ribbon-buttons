@@ -1,5 +1,6 @@
 import { App, TFile, setIcon } from 'obsidian';
 import { CustomButton, BuiltInButton, DragState, ButtonItem, DividerItem } from '../types';
+import { CustomIconManager } from './customIconManager';
 
 /**
  * 按钮管理器类
@@ -16,12 +17,16 @@ export class ButtonManager {
 	private toggleStates = new Map<string, boolean>();
 	// 存储按钮配置
 	private buttonConfigs = new Map<string, CustomButton>();
+	// 自定义图标管理器
+	private customIconManager: CustomIconManager;
 
 	constructor(
 		private app: App,
 		private onSettingsChange: () => void,
 		private onReorderButtons: (sourceIndex: number, targetIndex: number) => void
-	) {}
+	) {
+		this.customIconManager = CustomIconManager.getInstance();
+	}
 
 	/**
 	 * 初始化所有按钮
@@ -218,8 +223,32 @@ export class ButtonManager {
 			svgEl.remove();
 		}
 		
-		// 使用 setIcon 添加新图标
-		setIcon(buttonEl, newIcon);
+		// 使用辅助方法设置图标（支持自定义图标）
+		this.setButtonIcon(buttonEl, newIcon);
+	}
+
+	/**
+	 * 设置按钮图标（支持自定义图标）
+	 */
+	private setButtonIcon(buttonEl: HTMLElement, iconName: string) {
+		// 清空现有图标
+		const existingSvg = buttonEl.querySelector('svg');
+		if (existingSvg) {
+			existingSvg.remove();
+		}
+		
+		// 检查是否是自定义图标
+		if (iconName && iconName.startsWith('custom:')) {
+			const customIconId = iconName.substring(7);
+			const rendered = this.customIconManager.renderIcon(customIconId, buttonEl);
+			if (!rendered) {
+				// 如果渲染失败，使用默认图标
+				setIcon(buttonEl, 'help-circle');
+			}
+		} else {
+			// 使用内置图标
+			setIcon(buttonEl, iconName);
+		}
 	}
 
 	/**
@@ -247,11 +276,23 @@ export class ButtonManager {
 		try {
 			// @ts-ignore
 			const leftRibbon = this.app.workspace.leftRibbon;
+			
+			// 对于自定义图标，先创建一个占位图标
+			let displayIcon = icon;
+			if (icon && icon.startsWith('custom:')) {
+				displayIcon = 'help-circle'; // 占位符
+			}
+			
 			// @ts-ignore
-			const button = leftRibbon.makeRibbonItemButton(icon, tooltip, (e: MouseEvent) => {
+			const button = leftRibbon.makeRibbonItemButton(displayIcon, tooltip, (e: MouseEvent) => {
 				e.stopPropagation();
 				onClick();
 			});
+
+			// 如果是自定义图标，替换为实际的自定义图标
+			if (icon && icon.startsWith('custom:')) {
+				this.setButtonIcon(button, icon);
+			}
 
 			// 存储数组索引信息
 			if (arrayIndex >= 0) {

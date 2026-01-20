@@ -3,6 +3,7 @@ import { RibbonVaultButtonsSettings } from './src/types';
 import { DEFAULT_SETTINGS } from './src/settings';
 import { ButtonManager } from './src/utils/buttonManager';
 import { CustomButtonsSettingTab } from './src/settings/customButtonsSettingTab';
+import { CustomIconManager } from './src/utils/customIconManager';
 
 /**
  * Ribbon Vault Buttons 插件主类
@@ -11,9 +12,14 @@ import { CustomButtonsSettingTab } from './src/settings/customButtonsSettingTab'
 export default class RibbonVaultButtonsPlugin extends Plugin {
 	settings: RibbonVaultButtonsSettings;
 	buttonManager: ButtonManager;
+	customIconManager: CustomIconManager;
 
 	async onload() {
 		await this.loadSettings();
+		
+		// 初始化自定义图标管理器
+		this.customIconManager = CustomIconManager.getInstance();
+		this.customIconManager.loadIcons(this.settings.customIcons);
 		
 		// 初始化按钮管理器
 		this.buttonManager = new ButtonManager(
@@ -49,6 +55,11 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 				(item as any).toggleIcon = (item as any).icon;
 			}
 		});
+		
+		// 兼容性处理：为旧设置添加 customIcons 字段
+		if (!this.settings.customIcons) {
+			this.settings.customIcons = [];
+		}
 	}
 
 	/**

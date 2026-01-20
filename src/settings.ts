@@ -6,7 +6,8 @@ import { RibbonVaultButtonsSettings, CustomButton, DividerItem } from './types';
 export const DEFAULT_SETTINGS: RibbonVaultButtonsSettings = {
 	buttonItems: [],
 	hideBuiltInButtons: true,
-	hideDefaultActions: false
+	hideDefaultActions: false,
+	customIcons: []
 };
 
 /**
