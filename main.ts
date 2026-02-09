@@ -1,6 +1,6 @@
 import { Plugin } from 'obsidian';
 import { RibbonVaultButtonsSettings } from './src/types';
-import { DEFAULT_SETTINGS } from './src/settings';
+import { DEFAULT_SETTINGS, validateAndCleanSettings } from './src/settings';
 import { ButtonManager } from './src/utils/buttonManager';
 import { CustomButtonsSettingTab } from './src/settings/customButtonsSettingTab';
 import { CustomIconManager } from './src/utils/customIconManager';
@@ -47,7 +47,9 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	 * 加载设置
 	 */
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const data = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		this.settings = validateAndCleanSettings(this.settings);
 		
 		// 兼容性处理：为没有 toggleIcon 的旧按钮添加默认值
 		this.settings.buttonItems.forEach((item) => {
@@ -66,6 +68,7 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	 * 保存设置
 	 */
 	async saveSettings() {
+		this.settings = validateAndCleanSettings(this.settings);
 		await this.saveData(this.settings);
 	}
 
