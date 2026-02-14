@@ -19,7 +19,7 @@ export function createCustomButton(): CustomButton {
 		toggleIcon: 'lucide-plus',
 		tooltip: '新按钮',
 		type: 'command',
-		command: '',
+		command: 'app:open', // 使用一个默认的有效命令
 		file: '',
 		url: ''
 	};
