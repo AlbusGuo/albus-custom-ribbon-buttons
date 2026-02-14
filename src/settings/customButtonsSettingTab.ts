@@ -127,76 +127,45 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	private createAddButtons(containerEl: HTMLElement) {
 		const addButtonsContainer = containerEl.createDiv('basic-vault-button-add-container');
 		
-		// 添加新按钮
 		const addButton = addButtonsContainer.createEl('button', {
 			text: '添加新按钮',
-			cls: 'basic-vault-button-add-btn mod-cta'
+			cls: 'basic-vault-button-add-btn'
+		});
+		addButton.addEventListener('click', () => {
+			this.addCustomButton();
 		});
 		
-		// 保存this引用，确保在事件处理程序中可以访问
-		const self = this;
-		
-		// 添加点击事件监听器
-		addButton.addEventListener('click', async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			try {
-				await self.addCustomButton();
-			} catch (error) {
-				console.error('添加新按钮时出错:', error);
-			}
-		});
-		
-		// 添加分割线按钮
 		const addDividerButton = addButtonsContainer.createEl('button', {
 			text: '添加分割线',
 			cls: 'basic-vault-button-add-btn'
 		});
-		
-		// 添加点击事件监听器
-		addDividerButton.addEventListener('click', async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			try {
-				await self.addDivider();
-			} catch (error) {
-				console.error('添加分割线时出错:', error);
-			}
+		addDividerButton.addEventListener('click', () => {
+			this.addDivider();
 		});
 	}
-	private async addCustomButton() {
-		try {
-			const newButton = createCustomButton();
-			// 添加到列表末尾，而不是开头
-			this.plugin.settings.buttonItems.push(newButton);
-			await this.plugin.saveSettings();
-			this.plugin.initVaultButtons();
-			// 使用setTimeout延迟刷新界面，避免事件处理程序丢失
-			setTimeout(() => {
-				this.display();
-			}, 10);
-		} catch (error) {
-			console.error('添加新按钮时出错:', error);
-		}
+
+	/**
+	 * 添加自定义按钮
+	 */
+	private addCustomButton() {
+		const newButton = createCustomButton();
+		// 添加到列表末尾，而不是开头
+		this.plugin.settings.buttonItems.push(newButton);
+		this.plugin.saveSettings();
+		this.plugin.initVaultButtons();
+		this.display();
 	}
 
 	/**
 	 * 添加分割线
 	 */
-	private async addDivider() {
-		try {
-			const newDivider = createDivider();
-			// 添加到列表末尾，而不是开头
-			this.plugin.settings.buttonItems.push(newDivider);
-			await this.plugin.saveSettings();
-			this.plugin.initVaultButtons();
-			// 使用setTimeout延迟刷新界面，避免事件处理程序丢失
-			setTimeout(() => {
-				this.display();
-			}, 10);
-		} catch (error) {
-			console.error('添加分割线时出错:', error);
-		}
+	private addDivider() {
+		const newDivider = createDivider();
+		// 添加到列表末尾，而不是开头
+		this.plugin.settings.buttonItems.push(newDivider);
+		this.plugin.saveSettings();
+		this.plugin.initVaultButtons();
+		this.display();
 	}
 
 	/**

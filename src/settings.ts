@@ -19,7 +19,7 @@ export function createCustomButton(): CustomButton {
 		toggleIcon: 'lucide-plus',
 		tooltip: '新按钮',
 		type: 'command',
-		command: 'app:open', // 使用一个默认的有效命令
+		command: '',
 		file: '',
 		url: ''
 	};
@@ -81,14 +81,8 @@ function isValidSvg(content: string): boolean {
 export function validateAndCleanSettings(settings: RibbonVaultButtonsSettings): RibbonVaultButtonsSettings {
 	const cleaned = { ...settings };
 
-	// 验证buttonItems
-	cleaned.buttonItems = settings.buttonItems.filter(item => {
-		if (item.type === 'divider') {
-			return item.id && typeof item.id === 'string';
-		} else {
-			return validateCustomButton(item as CustomButton);
-		}
-	});
+	// 不再验证buttonItems，直接使用原始数据
+	cleaned.buttonItems = settings.buttonItems;
 
 	// 验证customIcons
 	cleaned.customIcons = settings.customIcons.filter(icon =>
