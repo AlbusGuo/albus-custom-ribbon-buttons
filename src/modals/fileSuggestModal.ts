@@ -14,8 +14,7 @@ export class FileSuggestModal extends FuzzySuggestModal<TFile> {
 	getItems(): TFile[] {
 		try {
 			return this.app.vault.getFiles();
-		} catch (error) {
-			console.warn('Failed to get files:', error);
+		} catch {
 			return [];
 		}
 	}

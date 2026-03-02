@@ -1,5 +1,3 @@
-import { TFile } from 'obsidian';
-
 /**
  * 自定义按钮类型
  */
@@ -54,32 +52,6 @@ export interface RibbonVaultButtonsSettings {
 	hideDefaultActions: boolean;
 	/** 自定义图标库 */
 	customIcons: CustomIcon[];
-}
-
-/**
- * 内置按钮配置
- */
-export interface BuiltInButton {
-	/** 按钮ID */
-	id: string;
-	/** 提示文字 */
-	tooltip: string;
-	/** 图标名称 */
-	icon: string;
-	/** 点击回调 */
-	onClick: () => void;
-	/** 是否支持拖拽 */
-	draggable: boolean;
-}
-
-/**
- * 拖拽状态
- */
-export interface DragState {
-	/** 是否正在拖拽 */
-	isDragging: boolean;
-	/** 拖拽源按钮ID */
-	dragSource: string | null;
 }
 
 /**

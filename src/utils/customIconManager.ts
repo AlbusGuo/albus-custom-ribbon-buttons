@@ -87,37 +87,37 @@ export class CustomIconManager {
 		try {
 			containerEl.empty();
 			
-			// 设置容器样式以居中图标
-			containerEl.style.display = 'flex';
-			containerEl.style.alignItems = 'center';
-			containerEl.style.justifyContent = 'center';
+			// 使用 DOMParser 安全解析 SVG，避免 innerHTML 的安全风险
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(content, 'image/svg+xml');
+			const svgEl = doc.querySelector('svg');
 			
-			containerEl.innerHTML = content;
+			if (!svgEl) {
+				return false;
+			}
 			
-			// 确保SVG元素有正确的尺寸 - 与内置图标一致
-			const svgEl = containerEl.querySelector('svg');
-			if (svgEl) {
-				// 设置固定尺寸，与 Obsidian 内置图标保持一致
-				svgEl.style.width = '16px';
-				svgEl.style.height = '16px';
-				svgEl.style.display = 'block';
-				
-				if (!svgEl.hasAttribute('viewBox')) {
-					// 如果没有viewBox，尝试从width/height推断
-					const width = svgEl.getAttribute('width');
-					const height = svgEl.getAttribute('height');
-					if (width && height) {
-						svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
-					} else {
-						// 默认viewBox
-						svgEl.setAttribute('viewBox', '0 0 24 24');
-					}
+			// 导入 SVG 节点到当前文档
+			const importedSvg = document.importNode(svgEl, true) as SVGElement;
+			
+			// 通过 CSS 类控制尺寸，避免硬编码样式
+			importedSvg.classList.add('custom-icon-svg');
+			
+			if (!importedSvg.hasAttribute('viewBox')) {
+				// 如果没有viewBox，尝试从width/height推断
+				const width = importedSvg.getAttribute('width');
+				const height = importedSvg.getAttribute('height');
+				if (width && height) {
+					importedSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+				} else {
+					// 默认viewBox
+					importedSvg.setAttribute('viewBox', '0 0 24 24');
 				}
 			}
 			
+			containerEl.appendChild(importedSvg);
+			
 			return true;
-		} catch (error) {
-			console.error(`渲染自定义图标失败: ${iconId}`, error);
+		} catch {
 			return false;
 		}
 	}

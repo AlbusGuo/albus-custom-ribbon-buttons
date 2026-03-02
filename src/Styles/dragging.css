@@ -1,9 +1,5 @@
 /* 拖拽排序样式 */
 
-.draggable-setting {
-  /* 不设置cursor，避免整个设置项显示拖拽光标 */
-}
-
 .draggable-setting.dragging {
   opacity: 0.5;
 }

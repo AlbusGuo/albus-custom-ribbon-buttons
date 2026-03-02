@@ -1,6 +1,25 @@
 import { App, TFile, setIcon } from 'obsidian';
-import { CustomButton, BuiltInButton, DragState, ButtonItem, DividerItem } from '../types';
+import { CustomButton, ButtonItem, DividerItem } from '../types';
 import { CustomIconManager } from './customIconManager';
+
+/**
+ * 内置按钮配置
+ */
+interface BuiltInButton {
+	id: string;
+	tooltip: string;
+	icon: string;
+	onClick: () => void;
+	draggable: boolean;
+}
+
+/**
+ * 拖拽状态
+ */
+interface DragState {
+	isDragging: boolean;
+	dragSource: string | null;
+}
 
 /**
  * 按钮管理器类
@@ -8,7 +27,6 @@ import { CustomIconManager } from './customIconManager';
  */
 export class ButtonManager {
 	private ribbonMap = new Map<string, HTMLElement>();
-	private styleElements: Record<string, HTMLStyleElement> = {};
 	private dragState: DragState = {
 		isDragging: false,
 		dragSource: null
@@ -32,10 +50,25 @@ export class ButtonManager {
 	 * 初始化所有按钮
 	 */
 	initVaultButtons(buttonItems: ButtonItem[], hideBuiltInButtons: boolean = true) {
+		// 获取 ribbon 容器引用，用于批量 DOM 更新
+		// @ts-ignore
+		const leftRibbon = this.app.workspace.leftRibbon;
+		const ribbonActionsEl = (leftRibbon as any)?.ribbonActionsEl as HTMLElement | undefined;
+
+		// 在创建按钮前暂时隐藏容器，防止逐个插入导致多次布局重排
+		if (ribbonActionsEl) {
+			ribbonActionsEl.style.display = 'none';
+		}
+
 		this.clearAllButtons();
 		this.initButtonItems(buttonItems);
 		if (hideBuiltInButtons) {
 			this.initBuiltInButtons();
+		}
+
+		// 恢复显示 — 浏览器只做一次布局计算，完全消除中间状态
+		if (ribbonActionsEl) {
+			ribbonActionsEl.style.display = '';
 		}
 	}
 
@@ -152,20 +185,15 @@ export class ButtonManager {
 				ribbonContainer.ribbonSettingEl.appendChild(dividerEl);
 			} else {
 				// 尝试找到正确的容器
-				try {
-					const container = (ribbonContainer as any).children?.[0] || ribbonContainer;
-					container.appendChild(dividerEl);
-				} catch (e) {
-					console.warn('Could not find ribbon container:', e);
-				}
+				const container = (ribbonContainer as any).children?.[0] || ribbonContainer;
+				container.appendChild(dividerEl);
 			}
 			this.ribbonMap.set(divider.id, dividerEl);
 			
 			return dividerEl;
-		} catch (error) {
-			console.warn('Failed to create divider:', error);
+		} catch {
 			const fallbackEl = document.createElement('div');
-			fallbackEl.style.display = 'none';
+			fallbackEl.classList.add('custom-ribbon-hidden');
 			return fallbackEl;
 		}
 	}
@@ -312,19 +340,13 @@ export class ButtonManager {
 				ribbonContainer.ribbonSettingEl.appendChild(button);
 			} else {
 				// 尝试找到正确的容器
-				try {
-					const container = (ribbonContainer as any).children?.[0] || ribbonContainer;
-					container.appendChild(button);
-				} catch (e) {
-					console.warn('Could not find ribbon container:', e);
-				}
+				const container = (ribbonContainer as any).children?.[0] || ribbonContainer;
+				container.appendChild(button);
 			}
 			return button;
-		} catch (error) {
-			console.warn('Failed to create ribbon button:', error);
-			// 返回一个空的div作为fallback
+		} catch {
 			const fallbackButton = document.createElement('div');
-			fallbackButton.style.display = 'none';
+			fallbackButton.classList.add('custom-ribbon-hidden');
 			return fallbackButton;
 		}
 	}
@@ -477,12 +499,11 @@ export class ButtonManager {
 	 * 执行命令
 	 */
 	private executeCommand(commandId: string) {
-		// 尝试通过全局API执行命令
 		try {
 			// @ts-ignore
 			this.app.commands.executeCommandById(commandId);
-		} catch (error) {
-			console.warn('Failed to execute command:', commandId, error);
+		} catch {
+			// 命令执行失败，静默失败
 		}
 	}
 
@@ -490,12 +511,11 @@ export class ButtonManager {
 	 * 显示库选择器
 	 */
 	private showVaultChooser() {
-		// 尝试打开库选择器
 		try {
 			// @ts-ignore
 			this.app.openVaultChooser();
-		} catch (error) {
-			console.warn('Failed to open vault chooser:', error);
+		} catch {
+			// 库选择器打开失败，静默失败
 		}
 	}
 
@@ -503,12 +523,11 @@ export class ButtonManager {
 	 * 显示帮助
 	 */
 	private showHelp() {
-		// 尝试打开帮助
 		try {
 			// @ts-ignore
 			this.app.openHelp();
-		} catch (error) {
-			console.warn('Failed to open help:', error);
+		} catch {
+			// 帮助打开失败，静默失败
 		}
 	}
 
@@ -516,127 +535,34 @@ export class ButtonManager {
 	 * 显示设置
 	 */
 	private showSettings() {
-		// 尝试打开设置
 		try {
 			// @ts-ignore
 			this.app.setting.open();
-		} catch (error) {
-			console.warn('Failed to open settings:', error);
+		} catch {
+			// 设置打开失败，静默失败
 		}
 	}
 
 	/**
-	 * 切换明暗主题
-	 */
-	private switchLightDark() {
-		try {
-			// @ts-ignore
-			const isDarkMode = this.app.vault.getConfig('theme') === 'obsidian';
-			if (isDarkMode) {
-				// @ts-ignore
-				this.app.setTheme('moonstone');
-				// @ts-ignore
-				this.app.vault.setConfig('theme', 'moonstone');
-				this.app.workspace.trigger('css-change');
-			} else {
-				// @ts-ignore
-				this.app.setTheme('obsidian');
-				// @ts-ignore
-				this.app.vault.setConfig('theme', 'obsidian');
-				this.app.workspace.trigger('css-change');
-			}
-		} catch (error) {
-			console.warn('Failed to switch theme:', error);
-		}
-	}
-
-	/**
-	 * 应用样式设置
+	 * 应用样式设置 - 通过切换 body 类来控制 CSS 可见性
 	 */
 	applyStyleSettings(hideBuiltInButtons: boolean = true) {
 		if (hideBuiltInButtons) {
-			// 隐藏内置按钮时应用样式
-			const styles = [
-				{ id: 'vault-profile', css: `
-					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile {
-						display: none;
-					}
-				` },
-				{ id: 'vault-switcher', css: `
-					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-switcher {
-						display: none;
-					}
-				` },
-				{ id: 'vault-actions-help', css: `
-					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.help) {
-						display: none;
-					}
-				` },
-				{ id: 'vault-actions-settings', css: `
-					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.lucide-settings) {
-						display: none;
-					}
-				` },
-				{ id: 'vault-actions-theme', css: `
-					body:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile .workspace-drawer-vault-actions .clickable-icon:has(svg.svg-icon.lucide-sun-moon) {
-						display: none;
-					}
-				` }
-			];
-
-			styles.forEach(({ id, css }) => {
-				this.updateStyle(id, css);
-			});
+			document.body.classList.remove('crb-show-builtin');
 		} else {
-			// 显示内置按钮时移除所有样式，让原生样式生效
-			const styleIds = ['vault-profile', 'vault-switcher', 'vault-actions-help', 'vault-actions-settings', 'vault-actions-theme'];
-			styleIds.forEach(id => {
-				this.removeStyle(id);
-			});
+			document.body.classList.add('crb-show-builtin');
 		}
 	}
 
 	/**
-	 * 应用默认功能区样式设置
+	 * 应用默认功能区样式设置 - 通过切换 body 类来控制 CSS 可见性
 	 */
 	applyDefaultActionsStyle(hideDefaultActions: boolean = false) {
 		if (hideDefaultActions) {
-			// 隐藏默认功能区时应用样式
-			const css = `
-				.side-dock-actions {
-					display: none !important;
-				}
-			`;
-			this.updateStyle('default-actions', css);
+			document.body.classList.add('crb-hide-default-actions');
 		} else {
-			// 显示默认功能区时移除样式
-			this.removeStyle('default-actions');
+			document.body.classList.remove('crb-hide-default-actions');
 		}
-	}
-
-	/**
-	 * 移除样式
-	 */
-	private removeStyle(id: string) {
-		const styleEl = this.styleElements[id];
-		if (styleEl) {
-			styleEl.remove();
-			delete this.styleElements[id];
-		}
-	}
-
-	/**
-	 * 更新样式
-	 */
-	private updateStyle(id: string, css: string) {
-		let styleEl = this.styleElements[id];
-		if (!styleEl) {
-			styleEl = document.createElement('style');
-			styleEl.id = id;
-			document.head.appendChild(styleEl);
-			this.styleElements[id] = styleEl;
-		}
-		styleEl.textContent = css;
 	}
 
 	/**
@@ -644,9 +570,7 @@ export class ButtonManager {
 	 */
 	destroy() {
 		this.clearAllButtons();
-		for (const key in this.styleElements) {
-			this.styleElements[key].remove();
-		}
-		this.styleElements = {};
+		document.body.classList.remove('crb-show-builtin');
+		document.body.classList.remove('crb-hide-default-actions');
 	}
 }

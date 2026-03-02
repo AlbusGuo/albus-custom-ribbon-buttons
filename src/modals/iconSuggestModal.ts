@@ -86,7 +86,6 @@ export class IconSuggestModal extends SuggestModal<string> {
 			this.close();
 			
 			if (!this.onAddCustomIcon) {
-				console.warn('未提供自定义图标保存回调');
 				return;
 			}
 			
@@ -99,9 +98,7 @@ export class IconSuggestModal extends SuggestModal<string> {
 							// 选择自定义图标回调
 							this.onChoose(`custom:${selectedIcon}`);
 						},
-						this.onAddCustomIcon || (async () => {
-							console.warn('未提供添加图标回调');
-						}),
+						this.onAddCustomIcon || (async () => {}),
 						this.onDeleteCustomIcon || (async (id: string) => {
 							// 如果没有提供删除回调，只从管理器中删除
 							this.customIconManager.removeIcon(id);

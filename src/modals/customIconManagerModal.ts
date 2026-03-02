@@ -1,4 +1,4 @@
-import { App, Modal, setIcon } from 'obsidian';
+import { App, Modal, Setting, setIcon } from 'obsidian';
 import { CustomIcon } from '../types';
 import { CustomIconManager } from '../utils/customIconManager';
 import { CustomIconUploadModal } from './customIconUploadModal';
@@ -35,7 +35,7 @@ export class CustomIconManagerModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass('custom-icon-manager-modal');
 
-		contentEl.createEl('h2', { text: '自定义图标管理' });
+		new Setting(contentEl).setName('自定义图标管理').setHeading();
 
 		// 内容容器
 		this.contentContainer = contentEl.createDiv('custom-icon-manager-content');

@@ -1,18 +1,24 @@
 /* NOTE: make any modifications to this file in src/Styles/styles.css */
 
+/* 防止初始化时功能区布局闪烁：插件就绪 (crb-ready) 前隐藏整个左侧功能区，
+   同时禁用所有过渡动画，确保显示时直接呈现最终布局状态 */
+body:not(.crb-ready):not(.is-mobile) .workspace-ribbon.mod-left,
+body:not(.crb-ready):not(.is-mobile) .workspace-ribbon.mod-left * {
+  visibility: hidden !important;
+  transition: none !important;
+}
+
+/* 隐藏内置按钮区域 - 插件启用后默认生效, 通过 crb-show-builtin 类来取消隐藏 */
+body:not(.is-mobile):not(.crb-show-builtin) .workspace-split.mod-left-split .workspace-sidedock-vault-profile {
+  display: none !important;
+}
+
+/* 隐藏默认功能区 - 通过 crb-hide-default-actions 类控制 */
+body.crb-hide-default-actions .side-dock-actions {
+  display: none !important;
+}
+
 /* 设置面板样式 */
-
-/* 主容器样式 */
-.basic-vault-button-header {
-  margin-bottom: 16px;
-}
-
-.basic-vault-button-header h2 {
-  margin: 0;
-  color: var(--text-normal);
-  font-size: 18px;
-  font-weight: 600;
-}
 
 /* 按钮列表容器 - 参考 Note Toolbar */
 .basic-vault-button-list-container {
@@ -121,73 +127,6 @@
   cursor: grabbing;
 }
 
-/* 设置项间距优化 */
-.basic-vault-button-container .setting-item {
-  padding: 8px 0;
-  margin-bottom: 0;
-}
-
-/* 可点击的输入框样式 */
-.basic-vault-button-container .setting-item-control input[type="text"]:focus {
-  cursor: pointer;
-  box-shadow: 0 0 0 2px var(--interactive-accent);
-}
-
-/* 命令和文件输入框的特殊样式 */
-.basic-vault-button-container .setting-item-control input[placeholder*="命令ID"],
-.basic-vault-button-container .setting-item-control input[placeholder*="文件路径"] {
-  cursor: pointer;
-  background: var(--background-modifier-form-field);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  transition: all 0.2s ease;
-}
-
-.basic-vault-button-container .setting-item-control input[placeholder*="命令ID"]:hover,
-.basic-vault-button-container .setting-item-control input[placeholder*="文件路径"]:hover {
-  border-color: var(--interactive-accent);
-  background: var(--background-primary);
-}
-
-.basic-vault-button-container .setting-item-control input[placeholder*="命令ID"]:focus,
-.basic-vault-button-container .setting-item-control input[placeholder*="文件路径"]:focus {
-  border-color: var(--interactive-accent);
-  background: var(--background-primary);
-  box-shadow: 0 0 0 2px var(--interactive-accent);
-}
-
-/* 隐藏搜索输入框的放大镜图标 */
-.basic-vault-button-container .setting-item-control .search-input-container::before {
-  display: none !important;
-}
-
-/* 隐藏搜索输入框的清除按钮图标 */
-.basic-vault-button-container .setting-item-control .search-input-container .clickable-icon {
-  display: none !important;
-}
-
-/* 单行布局控件样式 */
-.basic-vault-button-container .setting-item-control {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.basic-vault-button-container .setting-item-control input[type="text"],
-.basic-vault-button-container .setting-item-control select {
-  min-width: 120px;
-  max-width: 150px;
-  font-size: 12px;
-  padding: 4px 6px;
-}
-
-.basic-vault-button-container .setting-item-control .dropdown {
-  min-width: 80px;
-  max-width: 100px;
-}
-
 /* 按钮设置项 - 默认横向布局，宽度不足时切换为自适应布局 */
 .basic-vault-button-setting {
   /* 默认保持 Obsidian 原生布局 */
@@ -235,31 +174,8 @@
   }
 }
 
-/* 删除按钮样式 */
-.basic-vault-button-container .setting-item-extra-button {
-  color: var(--color-red);
-  margin-left: 4px;
-}
-
-.basic-vault-button-container .setting-item-extra-button:hover {
-  color: var(--color-red-dark);
-}
-
 /* 响应式调整 */
 @media (max-width: 768px) {
-  .basic-vault-button-container .setting-item-control {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-  }
-  
-  .basic-vault-button-container .setting-item-control input[type="text"],
-  .basic-vault-button-container .setting-item-control select,
-  .basic-vault-button-container .setting-item-control .dropdown {
-    max-width: 100%;
-    width: 100%;
-  }
-  
   .basic-vault-button-add-container {
     flex-direction: column;
   }
@@ -298,40 +214,19 @@
   }
 }
 
-/* 命令搜索样式 */
-.command-search-container {
-  position: relative;
-  width: 100%;
-}
-
-.command-search-button {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border: none;
-  border-radius: 4px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-size: 11px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.command-search-button:hover {
-  background: var(--interactive-accent-hover);
-}
-
-.command-search-input {
-  padding-right: 70px !important;
-  width: 100%;
-}
-
 /* 按钮相关样式 */
+
+/* 自定义图标 SVG 尺寸 - 与内置图标一致 */
+.custom-icon-svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* 隐藏的回退元素 */
+.custom-ribbon-hidden {
+  display: none;
+}
 
 /* 紧凑型图标选择器样式 */
 .icon-picker-button-compact {
@@ -346,7 +241,7 @@
   border-radius: 4px;
   background: var(--background-primary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
   font-size: 14px;
   flex-shrink: 0;
 }
@@ -372,7 +267,7 @@
 
 /* 自定义功能区按钮样式 */
 .custom-ribbon-button {
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
   position: relative;
 }
 
@@ -413,10 +308,6 @@
 }
 
 /* 拖拽排序样式 */
-
-.draggable-setting {
-  /* 不设置cursor，避免整个设置项显示拖拽光标 */
-}
 
 .draggable-setting.dragging {
   opacity: 0.5;
@@ -463,6 +354,11 @@
 .custom-icon-file-select {
 	margin-bottom: 16px;
 	text-align: center;
+}
+
+/* 上传说明文字间距 */
+.custom-icon-upload-desc {
+	margin-bottom: 16px;
 }
 
 /* 自定义图标管理模态框 */

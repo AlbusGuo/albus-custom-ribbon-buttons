@@ -19,12 +19,11 @@ export class CustomIconUploadModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', { text: '添加自定义图标' });
+		new Setting(contentEl).setName('添加自定义图标').setHeading();
 
 		// 说明文字
-		const desc = contentEl.createDiv('setting-item-description');
+		const desc = contentEl.createDiv({ cls: 'setting-item-description custom-icon-upload-desc' });
 		desc.setText('选择一个或多个SVG文件作为自定义图标。文件名将作为图标ID。');
-		desc.style.marginBottom = '16px';
 
 		// 文件选择区域
 		const fileSelectContainer = contentEl.createDiv('custom-icon-file-select');
@@ -39,7 +38,7 @@ export class CustomIconUploadModal extends Modal {
 		fileInput.type = 'file';
 		fileInput.accept = '.svg';
 		fileInput.multiple = true;
-		fileInput.style.display = 'none';
+		fileInput.classList.add('custom-ribbon-hidden');
 		
 		fileInput.addEventListener('change', (e) => {
 			const target = e.target as HTMLInputElement;
@@ -133,8 +132,7 @@ export class CustomIconUploadModal extends Modal {
 			await this.onSubmit(icons);
 			new Notice(`成功添加 ${icons.length} 个自定义图标`);
 			this.close();
-		} catch (error) {
-			console.error('添加自定义图标失败:', error);
+		} catch {
 			new Notice('添加自定义图标失败');
 		}
 	}

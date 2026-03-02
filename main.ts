@@ -15,6 +15,9 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	customIconManager: CustomIconManager;
 
 	async onload() {
+		// 确保初始化期间功能区不可见（配合 CSS 中 crb-ready 规则）
+		document.body.classList.remove('crb-ready');
+
 		await this.loadSettings();
 		
 		// 初始化自定义图标管理器
@@ -32,6 +35,9 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		this.buttonManager.applyStyleSettings(this.settings.hideBuiltInButtons);
 		this.buttonManager.applyDefaultActionsStyle(this.settings.hideDefaultActions);
 		this.initVaultButtons();
+
+		// 初始化完成，一次性显示功能区最终状态
+		document.body.classList.add('crb-ready');
 		
 		// 添加设置选项卡
 		this.addSettingTab(new CustomButtonsSettingTab(this.app, this));

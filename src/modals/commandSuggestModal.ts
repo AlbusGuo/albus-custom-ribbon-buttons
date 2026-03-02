@@ -23,8 +23,7 @@ export class CommandSuggestModal extends FuzzySuggestModal<Command> {
 			}
 
 			return matchedCommands;
-		} catch (error) {
-			console.warn('Failed to get commands:', error);
+		} catch {
 			return [];
 		}
 	}

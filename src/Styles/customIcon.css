@@ -4,6 +4,11 @@
 	text-align: center;
 }
 
+/* 上传说明文字间距 */
+.custom-icon-upload-desc {
+	margin-bottom: 16px;
+}
+
 /* 自定义图标管理模态框 */
 .custom-icon-manager-modal .modal-content {
 	max-width: 600px;
