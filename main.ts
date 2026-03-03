@@ -13,6 +13,10 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	settings: RibbonVaultButtonsSettings;
 	buttonManager: ButtonManager;
 	customIconManager: CustomIconManager;
+	/** 当前正在执行的保存操作 */
+	private _savePromise: Promise<void> | null = null;
+	/** 是否有等待中的保存请求 */
+	private _savePending = false;
 
 	async onload() {
 		// 确保初始化期间功能区不可见（配合 CSS 中 crb-ready 规则）
@@ -51,9 +55,15 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 
 	/**
 	 * 加载设置
+	 * 对 data.json 损坏场景做防御处理，避免 JSON 解析失败导致插件无法加载
 	 */
 	async loadSettings() {
-		const data = await this.loadData();
+		let data: any = null;
+		try {
+			data = await this.loadData();
+		} catch {
+			// data.json 损坏或为空 — 使用默认设置，不立即覆写文件
+		}
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 		this.settings = validateAndCleanSettings(this.settings);
 		
@@ -71,11 +81,31 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	}
 
 	/**
-	 * 保存设置
+	 * 保存设置（串行化）
+	 * 确保同一时刻只有一次写入操作，快速连续的调用会被合并为一次写入，
+	 * 避免并发 saveData 导致 data.json 被截断损坏
 	 */
 	async saveSettings() {
 		this.settings = validateAndCleanSettings(this.settings);
-		await this.saveData(this.settings);
+
+		// 如果已有写入正在进行，标记待写入并立即返回
+		if (this._savePromise) {
+			this._savePending = true;
+			return;
+		}
+
+		this._savePromise = this.saveData(this.settings);
+		try {
+			await this._savePromise;
+		} finally {
+			this._savePromise = null;
+		}
+
+		// 写入完成后如果有新的待写入请求，再执行一次（使用最新内存数据）
+		if (this._savePending) {
+			this._savePending = false;
+			await this.saveSettings();
+		}
 	}
 
 	/**
@@ -90,17 +120,15 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	/**
 	 * 处理设置变化
 	 */
-	private handleSettingsChange() {
-		// 重新排序按钮的逻辑可以在这里实现
-		// 目前先保存设置并重新初始化
-		this.saveSettings();
+	private async handleSettingsChange() {
+		await this.saveSettings();
 		this.initVaultButtons();
 	}
 
 	/**
 	 * 重新排序按钮项
 	 */
-	reorderButtons(sourceIndex: number, targetIndex: number) {
+	async reorderButtons(sourceIndex: number, targetIndex: number) {
 		if (sourceIndex === targetIndex) return;
 		
 		// 重新排序数组
@@ -108,7 +136,7 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		this.settings.buttonItems.splice(targetIndex, 0, movedItem);
 		
 		// 保存设置并重新初始化按钮
-		this.saveSettings();
+		await this.saveSettings();
 		this.initVaultButtons();
 	}
 }

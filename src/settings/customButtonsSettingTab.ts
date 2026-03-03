@@ -147,11 +147,11 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	/**
 	 * 添加自定义按钮
 	 */
-	private addCustomButton() {
+	private async addCustomButton() {
 		const newButton = createCustomButton();
 		// 添加到列表末尾，而不是开头
 		this.plugin.settings.buttonItems.push(newButton);
-		this.plugin.saveSettings();
+		await this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
 	}
@@ -159,11 +159,11 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	/**
 	 * 添加分割线
 	 */
-	private addDivider() {
+	private async addDivider() {
 		const newDivider = createDivider();
 		// 添加到列表末尾，而不是开头
 		this.plugin.settings.buttonItems.push(newDivider);
-		this.plugin.saveSettings();
+		await this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
 	}
@@ -171,9 +171,9 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	/**
 	 * 删除按钮项
 	 */
-	private removeButtonItem(index: number) {
+	private async removeButtonItem(index: number) {
 		this.plugin.settings.buttonItems.splice(index, 1);
-		this.plugin.saveSettings();
+		await this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
 	}
@@ -499,11 +499,11 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 	/**
 	 * 重新排序项目
 	 */
-	private reorderItems(fromIndex: number, toIndex: number) {
+	private async reorderItems(fromIndex: number, toIndex: number) {
 		const items = this.plugin.settings.buttonItems;
 		const [movedItem] = items.splice(fromIndex, 1);
 		items.splice(toIndex, 0, movedItem);
-		this.plugin.saveSettings();
+		await this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
 	}
