@@ -49,9 +49,6 @@ function isValidSvg(content: string): boolean {
 export function validateAndCleanSettings(settings: RibbonVaultButtonsSettings): RibbonVaultButtonsSettings {
 	const cleaned = { ...settings };
 
-	// 不再验证buttonItems，直接使用原始数据
-	cleaned.buttonItems = settings.buttonItems;
-
 	// 验证customIcons
 	cleaned.customIcons = settings.customIcons.filter(icon =>
 		icon.id && typeof icon.id === 'string' &&

@@ -428,7 +428,6 @@ export class ButtonManager {
 	 */
 	private makeDividerDraggable(divider: HTMLElement, dividerId: string, arrayIndex: number) {
 		divider.setAttribute('draggable', 'true');
-		divider.classList.add('custom-ribbon-divider');
 
 		divider.addEventListener('dragstart', (e) => {
 			this.dragState.isDragging = true;
@@ -471,28 +470,9 @@ export class ButtonManager {
 			divider.classList.remove('drag-over');
 
 			if (this.dragState.isDragging && this.dragState.dragSource && this.dragState.dragSource !== dividerId) {
-				this.handleReorderDividers(this.dragState.dragSource, dividerId);
+				this.handleReorderButtons(this.dragState.dragSource, dividerId);
 			}
 		});
-	}
-
-	/**
-	 * 处理分割线重新排序
-	 */
-	private handleReorderDividers(sourceId: string, targetId: string) {
-		// 通过存储的索引信息找到实际的数组索引
-		const sourceElement = this.ribbonMap.get(sourceId);
-		const targetElement = this.ribbonMap.get(targetId);
-		
-		if (!sourceElement || !targetElement) return;
-		
-		const sourceIndex = parseInt(sourceElement.dataset.arrayIndex || '-1');
-		const targetIndex = parseInt(targetElement.dataset.arrayIndex || '-1');
-		
-		if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return;
-
-		// 调用外部回调来处理数组重新排序
-		this.onReorderButtons(sourceIndex, targetIndex);
 	}
 
 	/**

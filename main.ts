@@ -17,6 +17,8 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	private _savePromise: Promise<void> | null = null;
 	/** 是否有等待中的保存请求 */
 	private _savePending = false;
+	/** 上一次成功写入磁盘的数据快照（JSON 字符串），用于备份 */
+	private _lastSavedData: string | null = null;
 
 	async onload() {
 		// 确保初始化期间功能区不可见（配合 CSS 中 crb-ready 规则）
@@ -51,19 +53,32 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		if (this.buttonManager) {
 			this.buttonManager.destroy();
 		}
+		document.body.classList.remove('crb-ready');
+	}
+
+	/** 备份文件路径 */
+	private get backupPath(): string {
+		return `${this.manifest.dir}/data.backup.json`;
 	}
 
 	/**
 	 * 加载设置
-	 * 对 data.json 损坏场景做防御处理，避免 JSON 解析失败导致插件无法加载
+	 * 对 data.json 损坏场景做防御处理：先尝试主文件，失败后从备份恢复
 	 */
 	async loadSettings() {
 		let data: any = null;
 		try {
 			data = await this.loadData();
 		} catch {
-			// data.json 损坏或为空 — 使用默认设置，不立即覆写文件
+			// data.json 损坏或为空 — 尝试从备份恢复
+			data = await this.loadBackup();
 		}
+
+		// 防御：确保 data 是普通对象
+		if (!data || typeof data !== 'object' || Array.isArray(data)) {
+			data = null;
+		}
+
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 		this.settings = validateAndCleanSettings(this.settings);
 		
@@ -78,12 +93,35 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		if (!this.settings.customIcons) {
 			this.settings.customIcons = [];
 		}
+
+		// 记录初始已知有效数据，供后续备份使用
+		this._lastSavedData = JSON.stringify(this.settings);
+	}
+
+	/**
+	 * 从备份文件恢复设置数据
+	 * 若恢复成功，同步修复 data.json
+	 */
+	private async loadBackup(): Promise<any> {
+		try {
+			const raw = await this.app.vault.adapter.read(this.backupPath);
+			const data = JSON.parse(raw);
+			if (data && typeof data === 'object' && !Array.isArray(data)) {
+				// 备份有效，同步修复 data.json
+				await this.saveData(data);
+				return data;
+			}
+		} catch {
+			// 备份也不可用
+		}
+		return null;
 	}
 
 	/**
 	 * 保存设置（串行化）
 	 * 确保同一时刻只有一次写入操作，快速连续的调用会被合并为一次写入，
-	 * 避免并发 saveData 导致 data.json 被截断损坏
+	 * 避免并发 saveData 导致 data.json 被截断损坏。
+	 * 每次写入成功后异步更新备份文件，用于下次加载时的故障恢复。
 	 */
 	async saveSettings() {
 		this.settings = validateAndCleanSettings(this.settings);
@@ -97,6 +135,10 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		this._savePromise = this.saveData(this.settings);
 		try {
 			await this._savePromise;
+			// 写入成功 — 异步更新备份（不阻塞主流程）
+			const dataStr = JSON.stringify(this.settings);
+			this._lastSavedData = dataStr;
+			this.app.vault.adapter.write(this.backupPath, dataStr).catch(() => {});
 		} finally {
 			this._savePromise = null;
 		}
