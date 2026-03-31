@@ -1,4 +1,4 @@
-import { App, TFile, setIcon } from 'obsidian';
+import { App, ItemView, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
 import { CustomButton, ButtonItem, DividerItem } from '../types';
 import { CustomIconManager } from './customIconManager';
 
@@ -27,6 +27,8 @@ interface DragState {
  */
 export class ButtonManager {
 	private ribbonMap = new Map<string, HTMLElement>();
+	private buttonElements = new Map<string, Set<HTMLElement>>();
+	private pageHeaderButtons = new WeakMap<ItemView, Map<string, HTMLElement>>();
 	private dragState: DragState = {
 		isDragging: false,
 		dragSource: null
@@ -41,15 +43,16 @@ export class ButtonManager {
 	constructor(
 		private app: App,
 		private onSettingsChange: () => void,
-		private onReorderButtons: (sourceIndex: number, targetIndex: number) => void
+		private onReorderButtons: (sourceIndex: number, targetIndex: number) => void,
+		private shouldMaskCustomIcons: () => boolean
 	) {
-		this.customIconManager = CustomIconManager.getInstance();
+		this.customIconManager = CustomIconManager.getInstance(this.app);
 	}
 
 	/**
 	 * 初始化所有按钮
 	 */
-	initVaultButtons(buttonItems: ButtonItem[], hideBuiltInButtons: boolean = true) {
+	initVaultButtons(leftRibbonItems: ButtonItem[], pageHeaderItems: CustomButton[], hideBuiltInButtons: boolean = true) {
 		// 获取 ribbon 容器引用，用于批量 DOM 更新
 		// @ts-ignore
 		const leftRibbon = this.app.workspace.leftRibbon;
@@ -61,7 +64,9 @@ export class ButtonManager {
 		}
 
 		this.clearAllButtons();
-		this.initButtonItems(buttonItems);
+		this.initLeftRibbonItems(leftRibbonItems);
+		this.initPageHeaderItems(pageHeaderItems);
+		this.addPageHeaderButtons(pageHeaderItems);
 		if (hideBuiltInButtons) {
 			this.initBuiltInButtons();
 		}
@@ -81,7 +86,9 @@ export class ButtonManager {
 				value.remove();
 			}
 		});
+		this.removeButtonsFromAllLeaves();
 		this.ribbonMap.clear();
+		this.buttonElements.clear();
 		this.toggleStates.clear();
 		this.buttonConfigs.clear();
 	}
@@ -89,13 +96,19 @@ export class ButtonManager {
 	/**
 	 * 初始化按钮项（包含按钮和分割线）
 	 */
-	private initButtonItems(buttonItems: ButtonItem[]) {
+	private initLeftRibbonItems(buttonItems: ButtonItem[]) {
 		buttonItems.forEach((item, index) => {
 			if (item.type === 'divider') {
 				this.createDivider(item as DividerItem, index);
 			} else {
-				this.createCustomButton(item as CustomButton, index);
+				this.createCustomButton(item as CustomButton, index, 'left');
 			}
+		});
+	}
+
+	private initPageHeaderItems(buttonItems: CustomButton[]) {
+		buttonItems.forEach((item, index) => {
+			this.createCustomButton(item, index, 'page');
 		});
 	}
 
@@ -121,7 +134,7 @@ export class ButtonManager {
 			{
 				id: 'settings',
 				tooltip: '设置',
-				icon: 'lucide-settings',
+				icon: 'settings',
 				onClick: () => this.showSettings(),
 				draggable: false
 			}
@@ -135,8 +148,8 @@ export class ButtonManager {
 	/**
 	 * 创建自定义按钮
 	 */
-	createCustomButton(button: CustomButton, index: number) {
-		const buttonId = `custom-${index}`;
+	createCustomButton(button: CustomButton, index: number, area: 'left' | 'page') {
+		const buttonId = `${area}-${index}`;
 		
 		// 存储按钮配置
 		this.buttonConfigs.set(buttonId, button);
@@ -156,7 +169,11 @@ export class ButtonManager {
 			this.handleButtonClick(button);
 		};
 
-		return this.createRibbonButton(buttonId, button.tooltip, initialIcon, onClick, true, index);
+		if (area === 'left') {
+			return this.createRibbonButton(buttonId, button.tooltip, initialIcon, onClick, true, index);
+		}
+
+		return buttonId;
 	}
 
 	/**
@@ -208,6 +225,11 @@ export class ButtonManager {
 					this.executeCommand(button.command);
 				}
 				break;
+			case 'command-group':
+				if (button.commands.length > 0) {
+					void this.executeCommandGroup(button.commands);
+				}
+				break;
 			case 'file':
 				if (button.file) {
 					this.openFile(button.file);
@@ -221,14 +243,30 @@ export class ButtonManager {
 		}
 	}
 
+	private async executeCommandGroup(commandIds: string[]) {
+		for (const commandId of commandIds) {
+			if (!commandId) {
+				continue;
+			}
+
+			try {
+				await Promise.resolve(
+					// @ts-ignore
+					this.app.commands.executeCommandById(commandId)
+				);
+			} catch {
+				// 单个命令失败时继续后续命令，避免整组中断
+			}
+		}
+	}
+
 	/**
 	 * 切换按钮图标
 	 */
 	private toggleButtonIcon(buttonId: string) {
-		const buttonEl = this.ribbonMap.get(buttonId);
 		const buttonConfig = this.buttonConfigs.get(buttonId);
 		
-		if (!buttonEl || !buttonConfig) return;
+		if (!buttonConfig) return;
 
 		// 获取当前切换状态
 		const currentState = this.toggleStates.get(buttonId) || false;
@@ -244,37 +282,29 @@ export class ButtonManager {
 		// 根据新状态选择图标
 		const newIcon = newState ? (buttonConfig.toggleIcon || buttonConfig.icon) : buttonConfig.icon;
 
-		// 直接查找并更新 SVG 元素
-		const svgEl = buttonEl.querySelector('svg');
-		if (svgEl) {
-			// 移除旧的 SVG
-			svgEl.remove();
+		for (const buttonEl of this.buttonElements.get(buttonId) ?? []) {
+			buttonEl.querySelectorAll('svg, .custom-icon-svg').forEach((element) => element.remove());
+			void this.setButtonIcon(buttonEl, newIcon);
 		}
-		
-		// 使用辅助方法设置图标（支持自定义图标）
-		this.setButtonIcon(buttonEl, newIcon);
 	}
 
 	/**
 	 * 设置按钮图标（支持自定义图标）
 	 */
-	private setButtonIcon(buttonEl: HTMLElement, iconName: string) {
+	private async setButtonIcon(buttonEl: HTMLElement, iconName: string) {
 		// 清空现有图标
-		const existingSvg = buttonEl.querySelector('svg');
-		if (existingSvg) {
-			existingSvg.remove();
-		}
+		buttonEl.querySelectorAll('svg, .custom-icon-svg').forEach((element) => element.remove());
 		
-		// 检查是否是自定义图标
-		if (iconName && iconName.startsWith('custom:')) {
-			const customIconId = iconName.substring(7);
-			const rendered = this.customIconManager.renderIcon(customIconId, buttonEl);
+		if (this.customIconManager.isCustomIcon(iconName)) {
+			if (this.customIconManager.renderIconFromCache(iconName, buttonEl, this.shouldMaskCustomIcons())) {
+				return;
+			}
+
+			const rendered = await this.customIconManager.renderIcon(iconName, buttonEl, this.shouldMaskCustomIcons());
 			if (!rendered) {
-				// 如果渲染失败，使用默认图标
 				setIcon(buttonEl, 'help-circle');
 			}
 		} else {
-			// 使用内置图标
 			setIcon(buttonEl, iconName);
 		}
 	}
@@ -305,10 +335,10 @@ export class ButtonManager {
 			// @ts-ignore
 			const leftRibbon = this.app.workspace.leftRibbon;
 			
-			// 对于自定义图标，先创建一个占位图标
+			// 对于文件自定义图标，先创建一个占位图标
 			let displayIcon = icon;
-			if (icon && icon.startsWith('custom:')) {
-				displayIcon = 'help-circle'; // 占位符
+			if (this.customIconManager.isCustomIcon(icon)) {
+				displayIcon = 'help-circle';
 			}
 			
 			// @ts-ignore
@@ -317,9 +347,10 @@ export class ButtonManager {
 				onClick();
 			});
 
-			// 如果是自定义图标，替换为实际的自定义图标
-			if (icon && icon.startsWith('custom:')) {
-				this.setButtonIcon(button, icon);
+			if (this.customIconManager.isCustomIcon(icon)) {
+				if (!this.customIconManager.renderIconFromCache(icon, button, this.shouldMaskCustomIcons())) {
+					void this.setButtonIcon(button, icon);
+				}
 			}
 
 			// 存储数组索引信息
@@ -331,6 +362,7 @@ export class ButtonManager {
 				this.makeButtonDraggable(button, id);
 			}
 
+			this.registerButtonElement(id, button);
 			this.ribbonMap.set(id, button);
 			// 添加到缎带
 			const ribbonContainer = leftRibbon as any;
@@ -349,6 +381,99 @@ export class ButtonManager {
 			fallbackButton.classList.add('custom-ribbon-hidden');
 			return fallbackButton;
 		}
+	}
+
+	private registerButtonElement(id: string, element: HTMLElement) {
+		if (!this.buttonElements.has(id)) {
+			this.buttonElements.set(id, new Set());
+		}
+
+		this.buttonElements.get(id)?.add(element);
+	}
+
+	private unregisterButtonElement(id: string, element: HTMLElement) {
+		const elements = this.buttonElements.get(id);
+		if (!elements) {
+			return;
+		}
+
+		elements.delete(element);
+		if (elements.size === 0) {
+			this.buttonElements.delete(id);
+		}
+	}
+
+	private addPageHeaderButtons(buttonItems: CustomButton[]) {
+		window.requestAnimationFrame(() => {
+			this.app.workspace.iterateAllLeaves((leaf) => {
+				this.addButtonsToLeaf(leaf, buttonItems);
+			});
+		});
+	}
+
+	private addButtonsToLeaf(leaf: WorkspaceLeaf, buttonItems: CustomButton[]) {
+		const { view } = leaf;
+		if (!(view instanceof ItemView)) {
+			return;
+		}
+
+		const buttons = this.buttonsFor(view, true);
+		if (!buttons) {
+			return;
+		}
+
+		buttonItems.forEach((item, index) => {
+			const buttonId = `page-${index}`;
+			if (buttons.has(buttonId)) {
+				return;
+			}
+
+			const buttonConfig = item;
+			const iconName = (this.toggleStates.get(buttonId) || false)
+				? (buttonConfig.toggleIcon || buttonConfig.icon)
+				: buttonConfig.icon;
+
+			const actionEl = view.addAction('help-circle', buttonConfig.tooltip, () => {
+				this.app.workspace.setActiveLeaf(leaf, { focus: true });
+				this.toggleButtonIcon(buttonId);
+				this.handleButtonClick(buttonConfig);
+			});
+
+			actionEl.addClass('basic-vault-page-header-button');
+			actionEl.dataset.arrayIndex = index.toString();
+			buttons.set(buttonId, actionEl);
+			this.registerButtonElement(buttonId, actionEl);
+			void this.setButtonIcon(actionEl, iconName);
+		});
+	}
+
+	private buttonsFor(view: ItemView, create = false) {
+		if (create && !this.pageHeaderButtons.has(view)) {
+			this.pageHeaderButtons.set(view, new Map());
+		}
+
+		return this.pageHeaderButtons.get(view);
+	}
+
+	private removeButtonsFromAllLeaves() {
+		window.requestAnimationFrame(() => {
+			this.app.workspace.iterateAllLeaves((leaf) => {
+				if (!(leaf.view instanceof ItemView)) {
+					return;
+				}
+
+				const buttons = this.buttonsFor(leaf.view);
+				if (!buttons) {
+					return;
+				}
+
+				for (const [buttonId, element] of buttons.entries()) {
+					this.unregisterButtonElement(buttonId, element);
+					element.remove();
+				}
+				buttons.clear();
+			});
+		});
 	}
 
 	/**

@@ -1,21 +1,92 @@
 /* 设置面板样式 */
 
-/* 按钮列表容器 - 参考 Note Toolbar */
-.basic-vault-button-list-container {
-  padding-top: 0.75em;
+.basic-vault-button-setting-ui {
+  width: 100%;
 }
 
-.basic-vault-button-list-container .setting-item-heading {
-  padding-left: 0;
-  padding-right: 0;
-  margin-bottom: 1em;
+.basic-vault-settings-tabs {
+  display: flex;
+  justify-content: flex-start;
+  border-bottom: 1px solid var(--background-modifier-border);
+  overflow-x: auto;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.basic-vault-settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.basic-vault-settings-tab {
+  padding: 4px 8px;
+  margin-bottom: -1px;
+  border: 1px solid transparent;
+  border-radius: 5px 5px 0 0;
+  cursor: pointer;
+  font-size: var(--font-ui-medium);
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color .1s ease;
+  border-bottom: 2px solid transparent;
+  user-select: none;
+}
+
+.basic-vault-settings-tab:hover {
+  color: var(--text-normal);
+  border-bottom-color: var(--interactive-accent);
+}
+
+.basic-vault-settings-tab.is-active {
+  color: var(--text-normal);
+  font-weight: 600;
+  border-bottom-color: var(--interactive-accent);
+}
+
+.basic-vault-settings-content {
+  padding-top: 0;
+}
+
+.basic-vault-settings-content .setting-group + .setting-item-heading {
+  margin-top: 1.5em;
+}
+
+.basic-vault-settings-content .setting-item-control {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.basic-vault-settings-content .setting-item-control > * {
+  flex-shrink: 0;
+}
+
+.basic-vault-button-settings-content {
+  padding-top: 0;
+}
+
+.basic-vault-button-settings-content .setting-group + .setting-item-heading {
+  margin-top: 1.5em;
+}
+
+/* 按钮列表容器 - 对齐 custom-about-blank 的 heading 布局 */
+.basic-vault-button-list-container {
+  padding-top: 0;
+}
+
+.basic-vault-button-group {
+  background-color: var(--setting-items-background);
+  border-radius: var(--radius-m);
+  margin: 0 0 1em 0;
+  padding: 1em;
+  border-top: none;
 }
 
 /* 添加按钮容器样式 */
 .basic-vault-button-add-container {
   display: flex;
   gap: 0.75em;
-  margin: 1em 0;
+  margin: 0.75em 0.25em 0.25em;
+  padding-top: 0.75em;
+  border-top: var(--border-width) solid var(--background-modifier-border);
 }
 
 /* 添加按钮样式 */
@@ -68,10 +139,27 @@
 
 /* 按钮列表容器 - 完全按照 Note Toolbar */
 .basic-vault-button-list {
-  background-color: var(--setting-items-background);
-  border-radius: var(--radius-m);
-  margin: 0em 0em 1em 0em;
-  padding: 1em 1em;
+  background-color: transparent;
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.basic-vault-button-settings-content > .setting-group:first-child {
+  border-top: none;
+}
+
+.basic-vault-button-settings-content > .setting-group:first-child .setting-item:first-child {
+  padding-top: 0;
+}
+
+.basic-vault-button-settings-content .setting-item-control {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.basic-vault-button-settings-content .setting-item-control > * {
+  flex-shrink: 0;
 }
 
 .is-mobile .basic-vault-button-list {
@@ -84,6 +172,7 @@
   border-top: var(--border-width) solid var(--background-modifier-border);
   padding: 0.5em;
   margin: 0.25em;
+  min-height: 58px;
 }
 
 .basic-vault-button-list .setting-item:first-child {
@@ -109,7 +198,247 @@
 
 /* 按钮设置项 - 默认横向布局，宽度不足时切换为自适应布局 */
 .basic-vault-button-setting {
-  /* 默认保持 Obsidian 原生布局 */
+  align-items: center;
+}
+
+.basic-vault-button-setting .setting-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.basic-vault-button-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.basic-vault-button-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.basic-vault-button-name-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.basic-vault-button-name-icon:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.basic-vault-button-name-icon:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.basic-vault-button-setting .setting-item-name,
+.basic-vault-button-setting .setting-item-description {
+  overflow-wrap: anywhere;
+}
+
+.basic-vault-button-setting .setting-item-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.basic-vault-button-setting .setting-item-control {
+  flex: none;
+  margin-left: auto;
+}
+
+.icon-preview-static {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  width: 32px;
+  height: 28px;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  flex-shrink: 0;
+}
+
+.basic-vault-button-popover {
+  position: fixed;
+  z-index: 9999;
+  width: min(520px, calc(100vw - 24px));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-primary);
+  box-shadow: 0 18px 42px #00000038;
+}
+
+.basic-vault-button-popover-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.basic-vault-button-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.basic-vault-button-popover-title {
+  min-width: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.basic-vault-button-popover-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.basic-vault-button-popover-icon-button:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.basic-vault-button-popover-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.basic-vault-button-popover-close svg,
+.basic-vault-button-popover-icon-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.basic-vault-button-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.basic-vault-button-popover-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  flex: 0 0 auto;
+}
+
+.basic-vault-button-popover-select,
+.basic-vault-button-popover-input {
+  min-width: 0;
+  height: var(--input-height);
+  border-radius: var(--input-radius);
+}
+
+.basic-vault-button-popover-name-input,
+.basic-vault-button-popover-value-input {
+  flex: 1 1 180px;
+}
+
+.basic-vault-button-popover-picker-input {
+  cursor: pointer;
+}
+
+.basic-vault-button-popover-top-row {
+  flex-wrap: nowrap;
+}
+
+.basic-vault-button-popover-top-row .basic-vault-button-popover-label {
+  flex: 0 0 auto;
+}
+
+.basic-vault-button-popover-icon-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.basic-vault-button-popover-native-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 74px;
+}
+
+.basic-vault-button-popover-value-row {
+  align-items: flex-start;
+}
+
+.basic-vault-button-popover-command-group {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.basic-vault-button-command-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.basic-vault-button-command-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.basic-vault-button-command-index {
+  width: 20px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.basic-vault-button-command-input {
+  flex: 1 1 auto;
+}
+
+.basic-vault-button-command-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  padding: 6px 0;
+}
+
+.basic-vault-page-header-button {
+  order: -1000;
 }
 
 /* 当容器宽度小于 900px 时，控件自适应宽度 */
@@ -154,6 +483,17 @@
   }
 }
 
+@media (max-width: 600px) {
+  .basic-vault-button-popover-top-row {
+    flex-wrap: wrap;
+  }
+
+  .basic-vault-button-popover-native-select {
+    flex: 0 0 auto;
+    min-width: 74px;
+  }
+}
+
 /* 响应式调整 */
 @media (max-width: 768px) {
   .basic-vault-button-add-container {
@@ -173,10 +513,12 @@
 
 /* 在窄屏幕下，确保设置项的描述文本不会溢出 */
 @media (max-width: 600px) {
+  .basic-vault-button-settings-content .setting-item-info,
   .basic-vault-button-setting .setting-item-info {
     max-width: 100%;
   }
   
+  .basic-vault-button-settings-content .setting-item-description,
   .basic-vault-button-setting .setting-item-description {
     word-wrap: break-word;
     overflow-wrap: break-word;

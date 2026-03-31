@@ -1,121 +1,202 @@
-import { CustomIcon } from '../types';
+import { App, normalizePath } from 'obsidian';
+import { isValidSvgContent } from '../settings';
 
 /**
  * 自定义图标管理器
  * 负责注册、获取和渲染自定义SVG图标
  */
 export class CustomIconManager {
+	static readonly FILE_PREFIX = 'custom-file:';
 	private static instance: CustomIconManager;
-	private customIcons: Map<string, string> = new Map();
+	private app: App | null = null;
+	private iconContentCache = new Map<string, string | null>();
+	private pendingLoads = new Map<string, Promise<string | null>>();
 
 	private constructor() {}
 
 	/**
 	 * 获取单例实例
 	 */
-	static getInstance(): CustomIconManager {
+	static getInstance(app?: App): CustomIconManager {
 		if (!CustomIconManager.instance) {
 			CustomIconManager.instance = new CustomIconManager();
 		}
+
+		if (app) {
+			CustomIconManager.instance.app = app;
+		}
+
 		return CustomIconManager.instance;
 	}
 
 	/**
-	 * 加载自定义图标列表
+	 * 是否为文件自定义图标引用
 	 */
-	loadIcons(icons: CustomIcon[]): void {
-		this.customIcons.clear();
-		icons.forEach(icon => {
-			this.customIcons.set(icon.id, icon.content);
-		});
+	isCustomIcon(iconName: string): boolean {
+		return typeof iconName === 'string' && iconName.startsWith(CustomIconManager.FILE_PREFIX);
 	}
 
 	/**
-	 * 添加单个自定义图标
+	 * 创建文件自定义图标引用
 	 */
-	addIcon(id: string, content: string): void {
-		this.customIcons.set(id, content);
+	createIconReference(filePath: string): string {
+		return `${CustomIconManager.FILE_PREFIX}${normalizePath(filePath)}`;
 	}
 
 	/**
-	 * 删除自定义图标
+	 * 从图标引用中提取文件路径
 	 */
-	removeIcon(id: string): void {
-		this.customIcons.delete(id);
+	getFilePath(iconName: string): string | null {
+		if (!this.isCustomIcon(iconName)) {
+			return null;
+		}
+
+		return normalizePath(iconName.slice(CustomIconManager.FILE_PREFIX.length));
 	}
 
 	/**
-	 * 检查图标是否存在
+	 * 获取图标显示名称
 	 */
-	hasIcon(id: string): boolean {
-		return this.customIcons.has(id);
+	getDisplayName(iconName: string): string {
+		const filePath = this.getFilePath(iconName);
+		if (!filePath) {
+			return iconName;
+		}
+
+		const segments = filePath.split('/');
+		return segments[segments.length - 1] || filePath;
 	}
 
 	/**
-	 * 获取图标内容
+	 * 获取指定图标文件夹内的 SVG 图标引用
 	 */
-	getIconContent(id: string): string | undefined {
-		return this.customIcons.get(id);
+	async getIconsFromFolder(folderPath: string): Promise<string[]> {
+		if (!folderPath || !this.app) {
+			return [];
+		}
+
+		const normalizedFolderPath = normalizePath(folderPath).replace(/\/$/, '');
+		try {
+			const files = this.app.vault.getFiles();
+			return files
+				.filter((file) => {
+					if (file.extension.toLowerCase() !== 'svg') {
+						return false;
+					}
+
+					const normalizedFilePath = normalizePath(file.path);
+					return normalizedFilePath.startsWith(`${normalizedFolderPath}/`);
+				})
+				.map((file) => this.createIconReference(file.path))
+				.sort((left, right) => this.getDisplayName(left).localeCompare(this.getDisplayName(right), 'zh-CN'));
+		} catch {
+			return [];
+		}
+	}
+
+	async preloadIcons(iconNames: string[]): Promise<void> {
+		const uniqueIcons = Array.from(new Set(iconNames.filter((iconName) => this.isCustomIcon(iconName))));
+		await Promise.all(uniqueIcons.map((iconName) => this.ensureIconContent(iconName)));
 	}
 
 	/**
-	 * 获取所有自定义图标ID
+	 * 从文件读取 SVG 内容
 	 */
-	getAllIconIds(): string[] {
-		return Array.from(this.customIcons.keys());
+	private async readIconContent(iconName: string): Promise<string | null> {
+		const filePath = this.getFilePath(iconName);
+		if (!filePath || !this.app) {
+			return null;
+		}
+
+		try {
+			const content = await this.app.vault.adapter.read(filePath);
+			return isValidSvgContent(content) ? content : null;
+		} catch {
+			return null;
+		}
 	}
 
-	/**
-	 * 获取所有自定义图标
-	 */
-	getAllIcons(): CustomIcon[] {
-		return Array.from(this.customIcons.entries()).map(([id, content]) => ({
-			id,
-			content
-		}));
+	private async ensureIconContent(iconName: string): Promise<string | null> {
+		if (this.iconContentCache.has(iconName)) {
+			return this.iconContentCache.get(iconName) ?? null;
+		}
+
+		const pending = this.pendingLoads.get(iconName);
+		if (pending) {
+			return pending;
+		}
+
+		const loadPromise = this.readIconContent(iconName)
+			.then((content) => {
+				this.iconContentCache.set(iconName, content);
+				this.pendingLoads.delete(iconName);
+				return content;
+			})
+			.catch(() => {
+				this.iconContentCache.set(iconName, null);
+				this.pendingLoads.delete(iconName);
+				return null;
+			});
+
+		this.pendingLoads.set(iconName, loadPromise);
+		return loadPromise;
 	}
 
-	/**
-	 * 渲染自定义图标到DOM元素
-	 */
-	renderIcon(iconId: string, containerEl: HTMLElement): boolean {
-		const content = this.customIcons.get(iconId);
+	private toSvgDataUri(content: string): string {
+		return `url("data:image/svg+xml;utf8,${encodeURIComponent(content)}")`;
+	}
+
+	private renderMaskedSvgContent(content: string, containerEl: HTMLElement): boolean {
+		try {
+			containerEl.empty();
+			const maskEl = containerEl.createDiv({ cls: 'custom-icon-mask custom-icon-svg' });
+			maskEl.style.setProperty('--custom-icon-image', this.toSvgDataUri(content));
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	renderIconFromCache(iconName: string, containerEl: HTMLElement, masked = false): boolean {
+		const content = this.iconContentCache.get(iconName);
 		if (!content) {
 			return false;
 		}
 
+		return masked
+			? this.renderMaskedSvgContent(content, containerEl)
+			: this.renderSvgContent(content, containerEl);
+	}
+
+	/**
+	 * 渲染 SVG 内容到 DOM 元素
+	 */
+	private renderSvgContent(content: string, containerEl: HTMLElement): boolean {
 		try {
 			containerEl.empty();
-			
-			// 使用 DOMParser 安全解析 SVG，避免 innerHTML 的安全风险
+
 			const parser = new DOMParser();
 			const doc = parser.parseFromString(content, 'image/svg+xml');
 			const svgEl = doc.querySelector('svg');
-			
+
 			if (!svgEl) {
 				return false;
 			}
-			
-			// 导入 SVG 节点到当前文档
+
 			const importedSvg = document.importNode(svgEl, true) as SVGElement;
-			
-			// 通过 CSS 类控制尺寸，避免硬编码样式
 			importedSvg.classList.add('custom-icon-svg');
-			
+
 			if (!importedSvg.hasAttribute('viewBox')) {
-				// 如果没有viewBox，尝试从width/height推断
 				const width = importedSvg.getAttribute('width');
 				const height = importedSvg.getAttribute('height');
 				if (width && height) {
 					importedSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 				} else {
-					// 默认viewBox
 					importedSvg.setAttribute('viewBox', '0 0 24 24');
 				}
 			}
-			
+
 			containerEl.appendChild(importedSvg);
-			
 			return true;
 		} catch {
 			return false;
@@ -123,9 +204,20 @@ export class CustomIconManager {
 	}
 
 	/**
-	 * 清除所有自定义图标
+	 * 渲染自定义图标到DOM元素
 	 */
-	clear(): void {
-		this.customIcons.clear();
+	async renderIcon(iconName: string, containerEl: HTMLElement, masked = false): Promise<boolean> {
+		if (this.renderIconFromCache(iconName, containerEl, masked)) {
+			return true;
+		}
+
+		const content = await this.ensureIconContent(iconName);
+		if (!content) {
+			return false;
+		}
+
+		return masked
+			? this.renderMaskedSvgContent(content, containerEl)
+			: this.renderSvgContent(content, containerEl);
 	}
 }

@@ -1,12 +1,5 @@
 /* 按钮相关样式 */
 
-/* 自定义图标 SVG 尺寸 - 与内置图标一致 */
-.custom-icon-svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-}
-
 /* 隐藏的回退元素 */
 .custom-ribbon-hidden {
   display: none;

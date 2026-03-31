@@ -1,7 +1,7 @@
 /**
  * 自定义按钮类型
  */
-export type ButtonType = 'command' | 'file' | 'url';
+export type ButtonType = 'command' | 'file' | 'url' | 'command-group';
 
 /**
  * 分割线配置
@@ -17,9 +17,9 @@ export interface DividerItem {
  * 自定义按钮配置
  */
 export interface CustomButton {
-	/** 图标名称 */
+	/** 图标名称，支持 Obsidian 内置图标或 custom-file: 前缀的 SVG 文件路径 */
 	icon: string;
-	/** 切换后的图标名称 */
+	/** 切换后的图标名称，支持 Obsidian 内置图标或 custom-file: 前缀的 SVG 文件路径 */
 	toggleIcon: string;
 	/** 提示文字 */
 	tooltip: string;
@@ -31,6 +31,8 @@ export interface CustomButton {
 	file: string;
 	/** 网址 */
 	url: string;
+	/** 命令组，按顺序依次执行 */
+	commands: string[];
 	/** 图标显示状态：true表示显示切换图标，false或undefined表示显示主图标 */
 	iconState?: boolean;
 }
@@ -44,22 +46,26 @@ export type ButtonItem = CustomButton | DividerItem;
  * 插件设置接口
  */
 export interface RibbonVaultButtonsSettings {
-	/** 按钮项列表（包含按钮和分割线） */
-	buttonItems: ButtonItem[];
+	/** 左侧边栏按钮项列表（包含按钮和分割线） */
+	leftRibbonItems: ButtonItem[];
+	/** 页首按钮项列表（仅按钮） */
+	pageHeaderItems: CustomButton[];
+	/** SVG 图标文件夹，用于过滤自定义图标 */
+	iconFolder: string;
+	/** 是否将自定义 SVG 图标强制渲染为 var(--icon-color) */
+	iconMask: boolean;
 	/** 是否隐藏内置按钮 */
 	hideBuiltInButtons: boolean;
 	/** 是否隐藏默认功能区 */
 	hideDefaultActions: boolean;
-	/** 自定义图标库 */
-	customIcons: CustomIcon[];
+	/** 设置页当前标签 */
+	settingsTab: 'general' | 'left-ribbon' | 'page-header';
 }
 
 /**
- * 自定义图标
+ * 旧版内联自定义图标结构，仅用于迁移
  */
-export interface CustomIcon {
-	/** 图标ID */
+export interface LegacyCustomIcon {
 	id: string;
-	/** SVG内容 */
 	content: string;
 }

@@ -1,6 +1,6 @@
 import { Plugin } from 'obsidian';
-import { RibbonVaultButtonsSettings } from './src/types';
-import { DEFAULT_SETTINGS, validateAndCleanSettings } from './src/settings';
+import { LegacyCustomIcon, RibbonVaultButtonsSettings } from './src/types';
+import { DEFAULT_SETTINGS, isValidSvgContent, validateAndCleanSettings } from './src/settings';
 import { ButtonManager } from './src/utils/buttonManager';
 import { CustomButtonsSettingTab } from './src/settings/customButtonsSettingTab';
 import { CustomIconManager } from './src/utils/customIconManager';
@@ -23,18 +23,17 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	async onload() {
 		// 确保初始化期间功能区不可见（配合 CSS 中 crb-ready 规则）
 		document.body.classList.remove('crb-ready');
+		this.customIconManager = CustomIconManager.getInstance(this.app);
 
 		await this.loadSettings();
-		
-		// 初始化自定义图标管理器
-		this.customIconManager = CustomIconManager.getInstance();
-		this.customIconManager.loadIcons(this.settings.customIcons);
+		await this.customIconManager.preloadIcons(this.collectReferencedCustomIcons());
 		
 		// 初始化按钮管理器
 		this.buttonManager = new ButtonManager(
 			this.app, 
 			this.handleSettingsChange.bind(this),
-			this.reorderButtons.bind(this)
+			this.reorderButtons.bind(this),
+			() => this.settings.iconMask
 		);
 		
 		// 应用样式和初始化按钮
@@ -47,6 +46,14 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		
 		// 添加设置选项卡
 		this.addSettingTab(new CustomButtonsSettingTab(this.app, this));
+
+		this.registerEvent(this.app.workspace.on('layout-change', () => {
+			this.initVaultButtons();
+		}));
+
+		this.app.workspace.onLayoutReady(() => {
+			window.setTimeout(() => this.initVaultButtons(), 100);
+		});
 	}
 
 	onunload() {
@@ -56,9 +63,33 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		document.body.classList.remove('crb-ready');
 	}
 
+	/** 主设置文件路径 */
+	private get dataPath(): string {
+		return `${this.manifest.dir}/data.json`;
+	}
+
 	/** 备份文件路径 */
 	private get backupPath(): string {
 		return `${this.manifest.dir}/data.backup.json`;
+	}
+
+	private async readStoredSettings(): Promise<any> {
+		const exists = await this.app.vault.adapter.exists(this.dataPath);
+		if (exists) {
+			const raw = await this.app.vault.adapter.read(this.dataPath);
+			return JSON.parse(raw);
+		}
+
+		try {
+			return await this.loadData();
+		} catch {
+			return null;
+		}
+	}
+
+	private async writeStoredSettings(data: RibbonVaultButtonsSettings): Promise<void> {
+		const serialized = JSON.stringify(data, null, '\t');
+		await this.app.vault.adapter.write(this.dataPath, serialized);
 	}
 
 	/**
@@ -68,7 +99,7 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	async loadSettings() {
 		let data: any = null;
 		try {
-			data = await this.loadData();
+			data = await this.readStoredSettings();
 		} catch {
 			// data.json 损坏或为空 — 尝试从备份恢复
 			data = await this.loadBackup();
@@ -79,23 +110,121 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 			data = null;
 		}
 
+		const { migratedData, didMigrateLegacyIcons } = await this.migrateLegacyCustomIcons(data);
+		data = migratedData;
+
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 		this.settings = validateAndCleanSettings(this.settings);
-		
-		// 兼容性处理：为没有 toggleIcon 的旧按钮添加默认值
-		this.settings.buttonItems.forEach((item) => {
-			if (item.type !== 'divider' && !(item as any).toggleIcon) {
-				(item as any).toggleIcon = (item as any).icon;
-			}
-		});
-		
-		// 兼容性处理：为旧设置添加 customIcons 字段
-		if (!this.settings.customIcons) {
-			this.settings.customIcons = [];
-		}
 
 		// 记录初始已知有效数据，供后续备份使用
 		this._lastSavedData = JSON.stringify(this.settings);
+
+		if (didMigrateLegacyIcons) {
+			await this.saveSettings();
+		}
+	}
+
+	/** 旧版内联图标迁移目录 */
+	private get customIconDirPath(): string {
+		return `${this.manifest.dir}/custom-icons`;
+	}
+
+	/**
+	 * 将旧版内联 SVG 图标迁移为文件引用，避免继续把图标数据写入 data.json
+	 */
+	private async migrateLegacyCustomIcons(data: any): Promise<{ migratedData: any; didMigrateLegacyIcons: boolean }> {
+		if (!data || typeof data !== 'object' || Array.isArray(data)) {
+			return { migratedData: data, didMigrateLegacyIcons: false };
+		}
+
+		const legacyIcons = Array.isArray(data.customIcons) ? data.customIcons as LegacyCustomIcon[] : [];
+		if (legacyIcons.length === 0) {
+			if ('customIcons' in data) {
+				delete data.customIcons;
+				return { migratedData: data, didMigrateLegacyIcons: true };
+			}
+
+			return { migratedData: data, didMigrateLegacyIcons: false };
+		}
+
+		await this.ensureDirectory(this.customIconDirPath);
+		const migratedRefs = new Map<string, string>();
+		const usedPaths = new Set<string>();
+
+		for (let index = 0; index < legacyIcons.length; index++) {
+			const icon = legacyIcons[index];
+			if (!icon?.id || !icon?.content || !isValidSvgContent(icon.content)) {
+				continue;
+			}
+
+			const baseName = this.sanitizeFileName(icon.id) || `icon-${index + 1}`;
+			let filePath = `${this.customIconDirPath}/${baseName}.svg`;
+			let suffix = 1;
+
+			while (usedPaths.has(filePath)) {
+				filePath = `${this.customIconDirPath}/${baseName}-${suffix}.svg`;
+				suffix++;
+			}
+
+			usedPaths.add(filePath);
+			await this.app.vault.adapter.write(filePath, icon.content);
+			migratedRefs.set(icon.id, this.customIconManager.createIconReference(filePath));
+		}
+
+		if (Array.isArray(data.buttonItems)) {
+			for (const item of data.buttonItems) {
+				if (!item || item.type === 'divider') {
+					continue;
+				}
+
+				item.icon = this.replaceLegacyIconReference(item.icon, migratedRefs);
+				item.toggleIcon = this.replaceLegacyIconReference(item.toggleIcon, migratedRefs);
+			}
+		}
+
+		delete data.customIcons;
+		return { migratedData: data, didMigrateLegacyIcons: true };
+	}
+
+	private replaceLegacyIconReference(iconName: string, migratedRefs: Map<string, string>): string {
+		if (!iconName || !iconName.startsWith('custom:')) {
+			return iconName;
+		}
+
+		const legacyId = iconName.slice(7);
+		return migratedRefs.get(legacyId) || 'help-circle';
+	}
+
+	private sanitizeFileName(name: string): string {
+		return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-').trim();
+	}
+
+	private async ensureDirectory(dirPath: string) {
+		try {
+			const exists = await this.app.vault.adapter.exists(dirPath);
+			if (!exists) {
+				await this.app.vault.adapter.mkdir(dirPath);
+			}
+		} catch {
+			// 目录已存在或创建失败时交由后续写入处理
+		}
+	}
+
+	private collectReferencedCustomIcons(): string[] {
+		const iconNames: string[] = [];
+		for (const item of this.settings.leftRibbonItems) {
+			if (item.type === 'divider') {
+				continue;
+			}
+
+			iconNames.push(item.icon, item.toggleIcon || item.icon);
+		}
+
+		for (const item of this.settings.pageHeaderItems) {
+			iconNames.push(item.icon, item.toggleIcon || item.icon);
+		}
+
+		return iconNames;
 	}
 
 	/**
@@ -108,7 +237,7 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 			const data = JSON.parse(raw);
 			if (data && typeof data === 'object' && !Array.isArray(data)) {
 				// 备份有效，同步修复 data.json
-				await this.saveData(data);
+				await this.writeStoredSettings(validateAndCleanSettings(Object.assign({}, DEFAULT_SETTINGS, data)));
 				return data;
 			}
 		} catch {
@@ -132,11 +261,11 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 			return;
 		}
 
-		this._savePromise = this.saveData(this.settings);
+		this._savePromise = this.writeStoredSettings(this.settings);
 		try {
 			await this._savePromise;
 			// 写入成功 — 异步更新备份（不阻塞主流程）
-			const dataStr = JSON.stringify(this.settings);
+			const dataStr = JSON.stringify(this.settings, null, '\t');
 			this._lastSavedData = dataStr;
 			this.app.vault.adapter.write(this.backupPath, dataStr).catch(() => {});
 		} finally {
@@ -155,7 +284,11 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	 */
 	initVaultButtons() {
 		if (this.buttonManager) {
-			this.buttonManager.initVaultButtons(this.settings.buttonItems, this.settings.hideBuiltInButtons);
+			this.buttonManager.initVaultButtons(
+				this.settings.leftRibbonItems,
+				this.settings.pageHeaderItems,
+				this.settings.hideBuiltInButtons
+			);
 		}
 	}
 
@@ -174,8 +307,8 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		if (sourceIndex === targetIndex) return;
 		
 		// 重新排序数组
-		const [movedItem] = this.settings.buttonItems.splice(sourceIndex, 1);
-		this.settings.buttonItems.splice(targetIndex, 0, movedItem);
+		const [movedItem] = this.settings.leftRibbonItems.splice(sourceIndex, 1);
+		this.settings.leftRibbonItems.splice(targetIndex, 0, movedItem);
 		
 		// 保存设置并重新初始化按钮
 		await this.saveSettings();

@@ -1,125 +1,67 @@
 import { App, SuggestModal, setIcon, getIconIds } from 'obsidian';
 import { CustomIconManager } from '../utils/customIconManager';
-import { CustomIcon } from '../types';
+
+interface IconSuggestionItem {
+	value: string;
+	label: string;
+}
 
 /**
  * 图标选择器模态框
  */
-export class IconSuggestModal extends SuggestModal<string> {
-	private icons: string[];
+export class IconSuggestModal extends SuggestModal<IconSuggestionItem> {
+	private icons: IconSuggestionItem[];
 	private onChoose: (iconName: string) => void;
 	private customIconManager: CustomIconManager;
-	private readonly CUSTOM_ICON_OPTION = '__custom_icon_upload__';
-	private onAddCustomIcon?: (icons: CustomIcon[]) => Promise<void>;
-	private onDeleteCustomIcon?: (iconId: string) => Promise<void>;
+	private masked: boolean;
 
-	constructor(
-		app: App, 
-		onChoose: (iconName: string) => void,
-		onAddCustomIcon?: (icons: CustomIcon[]) => Promise<void>,
-		onDeleteCustomIcon?: (iconId: string) => Promise<void>
-	) {
+	constructor(app: App, icons: string[], masked: boolean, onChoose: (iconName: string) => void) {
 		super(app);
 		this.onChoose = onChoose;
-		this.onAddCustomIcon = onAddCustomIcon;
-		this.onDeleteCustomIcon = onDeleteCustomIcon;
 		this.customIconManager = CustomIconManager.getInstance();
-		
-		// 获取所有图标ID（内置 + 自定义）
-		const builtInIcons = getIconIds();
-		const customIcons = this.customIconManager.getAllIconIds();
-		
-		// 将自定义图标添加前缀以区分
-		const customIconsWithPrefix = customIcons.map(id => `custom:${id}`);
-		
-		// 组合图标列表：自定义图标选项 + 自定义图标 + 内置图标
-		this.icons = [this.CUSTOM_ICON_OPTION, ...customIconsWithPrefix, ...builtInIcons];
+		this.masked = masked;
+		this.icons = icons.map((icon) => ({
+			value: icon,
+			label: this.customIconManager.isCustomIcon(icon) ? this.customIconManager.getDisplayName(icon) : icon
+		}));
 		
 		this.setPlaceholder('搜索图标名称...');
 	}
 
-	getSuggestions(query: string): string[] {
+	static async create(app: App, iconFolder: string, masked: boolean, onChoose: (iconName: string) => void): Promise<IconSuggestModal> {
+		const customIconManager = CustomIconManager.getInstance(app);
+		const customIcons = await customIconManager.getIconsFromFolder(iconFolder);
+		return new IconSuggestModal(app, [...customIcons, ...getIconIds()], masked, onChoose);
+	}
+
+	getSuggestions(query: string): IconSuggestionItem[] {
 		const lowerQuery = query.toLowerCase();
-		
-		// 如果没有查询，返回所有图标（自定义图标选项始终在最前）
+
 		if (!lowerQuery) {
 			return this.icons;
 		}
-		
-		// 过滤图标，但自定义图标选项始终显示在顶部（如果匹配）
-		const filtered = this.icons.filter(icon => {
-			if (icon === this.CUSTOM_ICON_OPTION) {
-				return '自定义图标'.includes(lowerQuery) || 'custom'.includes(lowerQuery);
-			}
-			return icon.toLowerCase().includes(lowerQuery);
-		});
-		
-		return filtered;
+
+		const splitQueries = lowerQuery.trim().split(' ').filter(Boolean);
+		return this.icons.filter((icon) => splitQueries.every((keyword) => icon.label.toLowerCase().includes(keyword)));
 	}
 
-	renderSuggestion(icon: string, el: HTMLElement): void {
+	renderSuggestion(icon: IconSuggestionItem, el: HTMLElement): void {
 		el.classList.add('mod-complex');
-		
-		if (icon === this.CUSTOM_ICON_OPTION) {
-			// 特殊渲染：自定义图标上传选项 - 完全与内置图标相同的结构
-			el.createEl('div', { text: '自定义图标' });
-			setIcon(el.createEl('div'), 'plus-circle');
-		} else if (icon.startsWith('custom:')) {
-			// 渲染自定义图标
-			const iconId = icon.substring(7); // 移除 'custom:' 前缀
-			el.createEl('div', { text: iconId + ' (自定义)' });
-			const iconDiv = el.createEl('div');
-			const rendered = this.customIconManager.renderIcon(iconId, iconDiv);
-			if (!rendered) {
-				setIcon(iconDiv, 'help-circle');
-			}
+		el.createEl('div', { text: icon.label });
+
+		const previewEl = el.createEl('div');
+		if (this.customIconManager.isCustomIcon(icon.value)) {
+			void this.customIconManager.renderIcon(icon.value, previewEl, this.masked).then((rendered) => {
+				if (!rendered) {
+					setIcon(previewEl, 'help-circle');
+				}
+			});
 		} else {
-			// 渲染内置图标
-			el.createEl('div', { text: icon });
-			setIcon(el.createEl('div'), icon);
+			setIcon(previewEl, icon.value);
 		}
 	}
 
-	onChooseSuggestion(icon: string, evt: MouseEvent | KeyboardEvent): void {
-		if (icon === this.CUSTOM_ICON_OPTION) {
-			// 打开自定义图标管理模态框
-			this.close();
-			
-			if (!this.onAddCustomIcon) {
-				return;
-			}
-			
-			// 延迟打开，避免模态框冲突
-			setTimeout(() => {
-				import('./customIconManagerModal').then(({ CustomIconManagerModal }) => {
-					new CustomIconManagerModal(
-						this.app,
-						(selectedIcon: string) => {
-							// 选择自定义图标回调
-							this.onChoose(`custom:${selectedIcon}`);
-						},
-						this.onAddCustomIcon || (async () => {}),
-						this.onDeleteCustomIcon || (async (id: string) => {
-							// 如果没有提供删除回调，只从管理器中删除
-							this.customIconManager.removeIcon(id);
-						}),
-						() => {
-							// 更新回调 - 重新加载图标列表
-							const builtInIcons = getIconIds();
-							const customIcons = this.customIconManager.getAllIconIds();
-							const customIconsWithPrefix = customIcons.map(id => `custom:${id}`);
-							this.icons = [this.CUSTOM_ICON_OPTION, ...customIconsWithPrefix, ...builtInIcons];
-						}
-					).open();
-				});
-			}, 100);
-		} else if (icon.startsWith('custom:')) {
-			// 选择自定义图标
-			const iconId = icon.substring(7);
-			this.onChoose(`custom:${iconId}`);
-		} else {
-			// 选择内置图标
-			this.onChoose(icon);
-		}
+	onChooseSuggestion(icon: IconSuggestionItem, evt: MouseEvent | KeyboardEvent): void {
+		this.onChoose(icon.value);
 	}
 }
