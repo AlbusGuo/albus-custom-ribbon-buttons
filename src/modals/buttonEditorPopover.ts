@@ -158,13 +158,9 @@ export class ButtonEditorPopover {
 			this.close();
 		});
 
-		const topRowEl = this.contentEl.createDiv({ cls: 'basic-vault-button-popover-row basic-vault-button-popover-top-row' });
-		topRowEl.createDiv({
-			cls: 'basic-vault-button-popover-label',
-			text: '名称',
-		});
+		const nameControlEl = this.createFormRow(this.contentEl, '名称');
 
-		this.nameInputEl = topRowEl.createEl('input', {
+		this.nameInputEl = nameControlEl.createEl('input', {
 			cls: 'basic-vault-button-popover-input basic-vault-button-popover-name-input',
 			attr: { type: 'text', placeholder: '按钮名称' },
 		});
@@ -175,14 +171,14 @@ export class ButtonEditorPopover {
 			this.scheduleCommit();
 		});
 
-		const iconRowEl = this.contentEl.createDiv({ cls: 'basic-vault-button-popover-row' });
-		this.createIconField(iconRowEl, '主图标', this.draft.icon, false);
-		this.createIconField(iconRowEl, '切换图标', this.draft.toggleIcon, true);
-		iconRowEl.createDiv({
+		const compactRowEl = this.contentEl.createDiv({ cls: 'basic-vault-button-popover-compact-row' });
+		this.createIconField(compactRowEl, '主图标', this.draft.icon, false);
+		this.createIconField(compactRowEl, '切换图标', this.draft.toggleIcon, true);
+		compactRowEl.createDiv({
 			cls: 'basic-vault-button-popover-label',
 			text: '按钮类型',
 		});
-		this.typeSelectEl = iconRowEl.createEl('select');
+		this.typeSelectEl = compactRowEl.createEl('select');
 		this.typeSelectEl.addClass('dropdown');
 		this.typeSelectEl.addClass('basic-vault-button-popover-native-select');
 		[
@@ -204,9 +200,18 @@ export class ButtonEditorPopover {
 		this.renderValueEditor();
 	};
 
+	private createFormRow(parentEl: HTMLElement, label: string) {
+		const rowEl = parentEl.createDiv({ cls: 'basic-vault-button-popover-form-row' });
+		rowEl.createDiv({
+			cls: 'basic-vault-button-popover-label',
+			text: label,
+		});
+		return rowEl.createDiv({ cls: 'basic-vault-button-popover-control' });
+	}
+
 	private createIconField(parentEl: HTMLElement, label: string, iconName: string, isToggleIcon: boolean) {
+		parentEl.createDiv({ cls: 'basic-vault-button-popover-label', text: label });
 		const fieldEl = parentEl.createDiv({ cls: 'basic-vault-button-popover-icon-field' });
-		fieldEl.createDiv({ cls: 'basic-vault-button-popover-label', text: label });
 
 		const iconButton = fieldEl.createEl('button', {
 			cls: 'icon-picker-button-compact',
@@ -241,19 +246,15 @@ export class ButtonEditorPopover {
 		this.valueInputEl = null;
 		this.commandGroupContainerEl = null;
 
-		const valueRowEl = this.contentEl.createDiv({ cls: 'basic-vault-button-popover-row basic-vault-button-popover-value-row' });
-		valueRowEl.createDiv({
-			cls: 'basic-vault-button-popover-label',
-			text: this.getValueFieldName(),
-		});
+		const valueControlEl = this.createFormRow(this.contentEl, this.getValueFieldName());
 
 		if (this.draft.type === 'command-group') {
-			this.commandGroupContainerEl = valueRowEl.createDiv({ cls: 'basic-vault-button-popover-command-group' });
+			this.commandGroupContainerEl = valueControlEl.createDiv({ cls: 'basic-vault-button-popover-command-group' });
 			this.renderCommandGroupEditor();
 			return;
 		}
 
-		this.valueInputEl = valueRowEl.createEl('input', {
+		this.valueInputEl = valueControlEl.createEl('input', {
 			cls: 'basic-vault-button-popover-input basic-vault-button-popover-value-input',
 			attr: { type: 'text', placeholder: this.getValuePlaceholder() },
 		});
@@ -288,6 +289,7 @@ export class ButtonEditorPopover {
 
 		this.draft.commands.forEach((commandId, index) => {
 			const rowEl = listEl.createDiv({ cls: 'basic-vault-button-command-row' });
+			rowEl.dataset.index = index.toString();
 			rowEl.createDiv({
 				cls: 'basic-vault-button-command-index',
 				text: `${index + 1}`
@@ -339,7 +341,16 @@ export class ButtonEditorPopover {
 		addButton.addEventListener('click', () => {
 			this.draft.commands.push('');
 			this.renderCommandGroupEditor();
+			this.focusCommandInput(this.draft.commands.length - 1);
 			void this.commitChanges();
+		});
+	}
+
+	private focusCommandInput(index: number) {
+		window.requestAnimationFrame(() => {
+			const inputEl = this.commandGroupContainerEl?.querySelector<HTMLInputElement>(`.basic-vault-button-command-row[data-index="${index}"] .basic-vault-button-command-input`);
+			inputEl?.focus();
+			inputEl?.select();
 		});
 	}
 
@@ -362,9 +373,8 @@ export class ButtonEditorPopover {
 		if (this.valueInputEl) {
 			this.setCurrentValue(this.valueInputEl.value);
 		}
-		this.draft.commands = this.draft.commands.map((commandId) => commandId.trim()).filter(Boolean);
-
 		const nextButton = structuredClone(this.draft);
+		nextButton.commands = nextButton.commands.map((commandId) => commandId.trim()).filter(Boolean);
 		const nextState = JSON.stringify(nextButton);
 		if (nextState === this.lastCommittedState) {
 			return;
