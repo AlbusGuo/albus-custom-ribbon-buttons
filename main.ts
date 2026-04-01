@@ -17,8 +17,6 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	private _savePromise: Promise<void> | null = null;
 	/** 是否有等待中的保存请求 */
 	private _savePending = false;
-	/** 上一次成功写入磁盘的数据快照（JSON 字符串），用于备份 */
-	private _lastSavedData: string | null = null;
 
 	async onload() {
 		// 确保初始化期间功能区不可见（配合 CSS 中 crb-ready 规则）
@@ -115,9 +113,6 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 		this.settings = validateAndCleanSettings(this.settings);
-
-		// 记录初始已知有效数据，供后续备份使用
-		this._lastSavedData = JSON.stringify(this.settings);
 
 		if (didMigrateLegacyIcons) {
 			await this.saveSettings();
@@ -266,7 +261,6 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 			await this._savePromise;
 			// 写入成功 — 异步更新备份（不阻塞主流程）
 			const dataStr = JSON.stringify(this.settings, null, '\t');
-			this._lastSavedData = dataStr;
 			this.app.vault.adapter.write(this.backupPath, dataStr).catch(() => {});
 		} finally {
 			this._savePromise = null;

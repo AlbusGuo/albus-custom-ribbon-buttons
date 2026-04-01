@@ -79,14 +79,6 @@ body.crb-hide-default-actions .side-dock-actions {
   flex-shrink: 0;
 }
 
-.basic-vault-button-settings-content {
-  padding-top: 0;
-}
-
-.basic-vault-button-settings-content .setting-group + .setting-item-heading {
-  margin-top: 1.5em;
-}
-
 /* 按钮列表容器 - 对齐 custom-about-blank 的 heading 布局 */
 .basic-vault-button-list-container {
   padding-top: 0;
@@ -130,56 +122,12 @@ body.crb-hide-default-actions .side-dock-actions {
   background: var(--interactive-accent-hover);
 }
 
-/* 空状态样式 */
-.basic-vault-button-empty {
-  text-align: center;
-  padding: 2em 1.25em;
-  color: var(--text-muted);
-  background: var(--background-secondary);
-  border-radius: var(--radius-m);
-  margin: 1em 0;
-}
-
-.basic-vault-button-empty p {
-  margin: 8px 0;
-  font-size: 14px;
-}
-
-.basic-vault-button-empty .setting-item-description {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-/* 分割线 */
-.basic-vault-button-divider {
-  height: 1px;
-  background: var(--background-modifier-border);
-  margin: 12px 0;
-}
-
 /* 按钮列表容器 - 完全按照 Note Toolbar */
 .basic-vault-button-list {
   background-color: transparent;
   border-radius: 0;
   margin: 0;
   padding: 0;
-}
-
-.basic-vault-button-settings-content > .setting-group:first-child {
-  border-top: none;
-}
-
-.basic-vault-button-settings-content > .setting-group:first-child .setting-item:first-child {
-  padding-top: 0;
-}
-
-.basic-vault-button-settings-content .setting-item-control {
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.basic-vault-button-settings-content .setting-item-control > * {
-  flex-shrink: 0;
 }
 
 .is-mobile .basic-vault-button-list {
@@ -247,20 +195,69 @@ body.crb-hide-default-actions .side-dock-actions {
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 6px;
   color: var(--text-muted);
-  cursor: pointer;
   flex: 0 0 auto;
+  pointer-events: none;
 }
 
-.basic-vault-button-name-icon:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+.basic-vault-button-name-icon-stack {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
 }
 
-.basic-vault-button-name-icon:focus-visible {
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: 2px;
+.basic-vault-button-name-icon-layer {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+}
+
+.basic-vault-button-name-icon-layer svg,
+.basic-vault-button-name-icon-layer .custom-icon-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.basic-vault-button-name-icon.is-animated .basic-vault-button-name-icon-layer.is-primary {
+  animation: basic-vault-button-icon-primary-fade 4s ease-in-out infinite;
+}
+
+.basic-vault-button-name-icon.is-animated .basic-vault-button-name-icon-layer.is-toggle {
+  animation: basic-vault-button-icon-toggle-fade 4s ease-in-out infinite;
+}
+
+@keyframes basic-vault-button-icon-primary-fade {
+  0%, 42% {
+    opacity: 1;
+  }
+
+  50%, 92% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes basic-vault-button-icon-toggle-fade {
+  0%, 42% {
+    opacity: 0;
+  }
+
+  50%, 92% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 .basic-vault-button-setting .setting-item-name,
@@ -281,55 +278,20 @@ body.crb-hide-default-actions .side-dock-actions {
   margin-left: auto;
 }
 
-.icon-preview-static {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  width: 32px;
-  height: 28px;
-  padding: 4px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  background: var(--background-primary);
-  flex-shrink: 0;
-}
-
-.basic-vault-button-popover {
-  position: fixed;
-  z-index: 9999;
-  width: min(520px, calc(100vw - 24px));
-  border: 1px solid var(--background-modifier-border);
+.basic-vault-button-editor-modal-shell {
   border-radius: 12px;
-  background: var(--background-primary);
-  box-shadow: 0 18px 42px #00000038;
+  width: min(620px, calc(100vw - 24px));
+  max-width: min(620px, calc(100vw - 24px));
 }
 
-.basic-vault-button-popover-content {
+.basic-vault-button-editor-modal {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
 }
 
-.basic-vault-button-popover-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.basic-vault-button-popover-title {
-  min-width: 0;
-  font-size: var(--font-ui-small);
-  font-weight: 600;
-  color: var(--text-normal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.basic-vault-button-popover-icon-button {
+.basic-vault-button-editor-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -344,35 +306,17 @@ body.crb-hide-default-actions .side-dock-actions {
   box-shadow: none;
 }
 
-.basic-vault-button-popover-icon-button:hover {
+.basic-vault-button-editor-icon-button:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.basic-vault-button-popover-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-}
-
-.basic-vault-button-popover-close svg,
-.basic-vault-button-popover-icon-button svg {
+.basic-vault-button-editor-icon-button svg {
   width: 14px;
   height: 14px;
 }
 
-.basic-vault-button-popover-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.basic-vault-button-popover-form-row {
+.basic-vault-button-editor-form-row {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
@@ -380,7 +324,7 @@ body.crb-hide-default-actions .side-dock-actions {
   min-width: 0;
 }
 
-.basic-vault-button-popover-compact-row {
+.basic-vault-button-editor-compact-row {
   display: grid;
   grid-template-columns: 72px 48px 72px 48px 72px max-content;
   align-items: center;
@@ -388,7 +332,7 @@ body.crb-hide-default-actions .side-dock-actions {
   min-width: 0;
 }
 
-.basic-vault-button-popover-label {
+.basic-vault-button-editor-label {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   width: 72px;
@@ -396,53 +340,92 @@ body.crb-hide-default-actions .side-dock-actions {
   text-align: left;
 }
 
-.basic-vault-button-popover-control {
+.basic-vault-button-editor-control {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
 
-.basic-vault-button-popover-select,
-.basic-vault-button-popover-input {
+.basic-vault-button-editor-select,
+.basic-vault-button-editor-input {
   min-width: 0;
   height: var(--input-height);
   border-radius: var(--input-radius);
 }
 
-.basic-vault-button-popover-name-input,
-.basic-vault-button-popover-value-input {
+.basic-vault-button-editor-name-input,
+.basic-vault-button-editor-value-input {
   flex: 1 1 180px;
 }
 
-.basic-vault-button-popover-picker-input {
+.basic-vault-button-editor-picker-input {
   cursor: pointer;
 }
 
-.basic-vault-button-popover-top-row {
-  flex-wrap: nowrap;
-}
-
-.basic-vault-button-popover-icon-field {
+.basic-vault-button-editor-icon-field {
   display: inline-flex;
   align-items: center;
   min-height: var(--input-height);
   min-width: 0;
 }
 
-.basic-vault-button-popover-native-select {
+.basic-vault-button-editor-native-select {
   flex: 0 0 auto;
   width: fit-content;
   min-width: 0;
   max-width: 100%;
 }
 
-.basic-vault-button-popover-command-group {
+.basic-vault-button-editor-command-group {
   display: flex;
   flex: 1 1 100%;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+.basic-vault-button-editor-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: fit-content;
+  padding: 0 10px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.basic-vault-button-editor-text-button:hover {
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover, var(--interactive-accent));
+  background: var(--background-modifier-hover);
+}
+
+.basic-vault-confirm-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.basic-vault-confirm-modal h3 {
+  margin: 0;
+}
+
+.basic-vault-confirm-modal-message {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.basic-vault-confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .basic-vault-button-command-list {
@@ -523,22 +506,22 @@ body.crb-hide-default-actions .side-dock-actions {
 }
 
 @media (max-width: 600px) {
-  .basic-vault-button-popover-form-row {
+  .basic-vault-button-editor-form-row {
     grid-template-columns: 1fr;
     row-gap: 6px;
   }
 
-  .basic-vault-button-popover-compact-row {
+  .basic-vault-button-editor-compact-row {
     grid-template-columns: 1fr;
     row-gap: 6px;
   }
 
-  .basic-vault-button-popover-label {
+  .basic-vault-button-editor-label {
     width: auto;
     min-width: 0;
   }
 
-  .basic-vault-button-popover-native-select {
+  .basic-vault-button-editor-native-select {
     width: fit-content;
   }
 }
@@ -553,21 +536,14 @@ body.crb-hide-default-actions .side-dock-actions {
     width: 100%;
     justify-content: center;
   }
-  
-  .basic-vault-button-empty {
-    padding: 24px 16px;
-    margin: 12px 0;
-  }
 }
 
 /* 在窄屏幕下，确保设置项的描述文本不会溢出 */
 @media (max-width: 600px) {
-  .basic-vault-button-settings-content .setting-item-info,
   .basic-vault-button-setting .setting-item-info {
     max-width: 100%;
   }
-  
-  .basic-vault-button-settings-content .setting-item-description,
+
   .basic-vault-button-setting .setting-item-description {
     word-wrap: break-word;
     overflow-wrap: break-word;

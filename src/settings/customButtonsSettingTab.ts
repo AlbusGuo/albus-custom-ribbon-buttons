@@ -1,7 +1,8 @@
-import { App, Plugin, PluginSettingTab, Setting, SettingGroup, setIcon, setTooltip } from 'obsidian';
+import { App, Command, Plugin, PluginSettingTab, Setting, SettingGroup, setIcon, setTooltip } from 'obsidian';
 import { ButtonItem, CustomButton, DividerItem, RibbonVaultButtonsSettings } from '../types';
 import { createCustomButton, createDivider } from '../settings';
-import { ButtonEditorPopover } from '../modals/buttonEditorPopover';
+import { ButtonEditorModal } from '../modals/buttonEditorModal';
+import { ConfirmModal } from '../modals/confirmModal';
 import { CustomIconManager } from '../utils/customIconManager';
 import { FolderSuggester } from '../utils/folderSuggester';
 
@@ -91,7 +92,7 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		const items = this.getItems(area);
 
 		if (items.length === 0) {
-			this.createEmptyState(listContainer, area);
+			this.createEmptySetting(listContainer, area);
 		} else {
 			this.createButtonsList(listContainer, area);
 		}
@@ -161,15 +162,10 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		});
 	}
 
-	private createEmptyState(parentEl: HTMLElement, area: ButtonArea) {
-		const emptyState = parentEl.createDiv({ cls: 'basic-vault-button-empty' });
-		emptyState.createEl('p', {
-			text: area === 'left-ribbon' ? '还没有添加左侧边栏按钮' : '还没有添加页首按钮'
-		});
-		emptyState.createEl('p', {
-			text: area === 'left-ribbon' ? '点击下方按钮开始创建左侧边栏按钮或分割线' : '点击下方按钮开始创建页首按钮',
-			cls: 'setting-item-description'
-		});
+	private createEmptySetting(parentEl: HTMLElement, area: ButtonArea) {
+		new Setting(parentEl)
+			.setName(area === 'left-ribbon' ? '还没有添加左侧边栏按钮' : '还没有添加页首按钮')
+			.setDesc(area === 'left-ribbon' ? '点击下方按钮开始创建左侧边栏按钮或分割线' : '点击下方按钮开始创建页首按钮');
 	}
 
 	private createButtonsList(parentEl: HTMLElement, area: ButtonArea) {
@@ -192,8 +188,8 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 			text: area === 'left-ribbon' ? '添加新按钮' : '添加页首按钮',
 			cls: 'basic-vault-button-add-btn'
 		});
-		addButton.addEventListener('click', (event) => {
-			this.addCustomButton(area, event.currentTarget as HTMLElement);
+		addButton.addEventListener('click', () => {
+			void this.addCustomButton(area);
 		});
 
 		if (area === 'left-ribbon') {
@@ -207,7 +203,7 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		}
 	}
 
-	private async addCustomButton(area: ButtonArea, anchorEl: HTMLElement) {
+	private async addCustomButton(area: ButtonArea) {
 		const newButton = createCustomButton();
 		this.getItems(area).push(newButton);
 		await this.plugin.saveSettings();
@@ -215,9 +211,7 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		this.display();
 
 		const index = this.getItems(area).length - 1;
-		const rowSelector = `.basic-vault-button-list .setting-item[data-area="${area}"][data-index="${index}"]`;
-		const rowEl = this.containerEl.querySelector<HTMLElement>(rowSelector) ?? anchorEl;
-		this.openButtonEditor(area, index, rowEl, true);
+		this.openButtonEditor(area, index, true);
 	}
 
 	private async addDivider(area: Extract<ButtonArea, 'left-ribbon'>) {
@@ -232,6 +226,30 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		await this.plugin.saveSettings();
 		this.plugin.initVaultButtons();
 		this.display();
+	}
+
+	private async confirmRemoveItem(area: ButtonArea, index: number) {
+		const item = this.getItems(area)[index];
+		if (!item) {
+			return;
+		}
+
+		const isDivider = item.type === 'divider';
+		const confirmed = await ConfirmModal.confirm(this.app, {
+			title: isDivider ? '删除分割线' : '删除按钮',
+			message: isDivider
+				? '确定要删除这条分割线吗？此操作会立即生效。'
+				: `确定要删除“${(item as CustomButton).tooltip.trim() || '未命名按钮'}”吗？此操作会立即生效。`,
+			confirmText: '删除',
+			cancelText: '取消',
+			danger: true,
+		});
+
+		if (!confirmed) {
+			return;
+		}
+
+		await this.removeButtonItem(area, index);
 	}
 
 	private createButtonSetting(containerEl: HTMLElement, button: CustomButton, index: number, area: ButtonArea) {
@@ -251,25 +269,25 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 				.setIcon('pencil')
 				.setTooltip('编辑按钮')
 				.onClick(() => {
-					this.openButtonEditor(area, index, setting.settingEl);
+					this.openButtonEditor(area, index);
 				}))
 			.addExtraButton((extraButton) => extraButton
 				.setIcon('trash')
 				.setTooltip('删除按钮')
-				.onClick(() => this.removeButtonItem(area, index)));
+				.onClick(() => {
+					void this.confirmRemoveItem(area, index);
+				}));
 
 		this.addDragHandle(setting, index, area);
 	}
 
-	private openButtonEditor(area: ButtonArea, index: number, anchorEl: HTMLElement, refreshOnClose: boolean = true) {
+	private openButtonEditor(area: ButtonArea, index: number, refreshOnClose: boolean = true) {
 		const item = this.getItems(area)[index];
 		if (!item || item.type === 'divider') {
 			return;
 		}
 
-		new ButtonEditorPopover(this.app, item, {
-			anchorEl,
-			title: '编辑按钮',
+		new ButtonEditorModal(this.app, item, {
 			iconFolder: this.plugin.settings.iconFolder,
 			iconMask: this.plugin.settings.iconMask,
 			onChange: async (savedButton) => {
@@ -289,65 +307,58 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		setting.nameEl.empty();
 
 		const nameWrapEl = setting.nameEl.createSpan({ cls: 'basic-vault-button-name-wrap' });
+		const primaryIconName = button.icon || 'help-circle';
+		const toggleIconName = button.toggleIcon || primaryIconName;
+		const shouldAnimateToggle = primaryIconName !== toggleIconName;
 		const iconWrapEl = nameWrapEl.createSpan({
-			cls: 'basic-vault-button-name-icon',
-			attr: {
-				role: 'button',
-				tabindex: '0',
-				'aria-label': '切换图标预览'
-			}
+			cls: `basic-vault-button-name-icon${shouldAnimateToggle ? ' is-animated' : ''}`,
 		});
-		const previewEl = iconWrapEl.createSpan({ cls: 'icon-picker-preview-compact' });
+		const iconStackEl = iconWrapEl.createSpan({ cls: 'basic-vault-button-name-icon-stack' });
+		const primaryPreviewEl = iconStackEl.createSpan({ cls: 'basic-vault-button-name-icon-layer is-primary' });
+		const togglePreviewEl = shouldAnimateToggle
+			? iconStackEl.createSpan({ cls: 'basic-vault-button-name-icon-layer is-toggle' })
+			: null;
 		nameWrapEl.createSpan({
 			cls: 'basic-vault-button-name-text',
 			text: button.tooltip.trim() || '未命名按钮'
 		});
 
-		let showingToggleIcon = false;
-		const renderPreview = async () => {
-			const iconName = showingToggleIcon ? (button.toggleIcon || button.icon) : button.icon;
-			previewEl.empty();
+		const tooltipText = shouldAnimateToggle
+			? `主图标: ${this.plugin.customIconManager.getDisplayName(primaryIconName)}\n切换图标: ${this.plugin.customIconManager.getDisplayName(toggleIconName)}`
+			: `图标: ${this.plugin.customIconManager.getDisplayName(primaryIconName)}`;
+		setTooltip(iconWrapEl, tooltipText);
 
-			if (this.plugin.customIconManager.isCustomIcon(iconName)) {
-				const rendered = await this.plugin.customIconManager.renderIcon(iconName, previewEl, this.plugin.settings.iconMask);
-				if (!rendered) {
-					previewEl.setText('?');
-				}
-			} else {
-				try {
-					setIcon(previewEl, iconName || 'help-circle');
-				} catch {
-					previewEl.setText('?');
-				}
+		void this.renderNameIconPreview(primaryPreviewEl, primaryIconName);
+		if (togglePreviewEl) {
+			void this.renderNameIconPreview(togglePreviewEl, toggleIconName);
+		}
+	}
+
+	private async renderNameIconPreview(previewEl: HTMLElement, iconName: string) {
+		previewEl.empty();
+
+		if (this.plugin.customIconManager.isCustomIcon(iconName)) {
+			const rendered = await this.plugin.customIconManager.renderIcon(iconName, previewEl, this.plugin.settings.iconMask);
+			if (!rendered) {
+				previewEl.setText('?');
 			}
+			return;
+		}
 
-			const iconType = showingToggleIcon ? '切换图标' : '主图标';
-			setTooltip(iconWrapEl, `${iconType}: ${this.plugin.customIconManager.getDisplayName(iconName || 'help-circle')}`);
-		};
-
-		const togglePreview = () => {
-			showingToggleIcon = !showingToggleIcon;
-			void renderPreview();
-		};
-
-		iconWrapEl.addEventListener('click', togglePreview);
-		iconWrapEl.addEventListener('keydown', (event) => {
-			if (event.key === 'Enter' || event.key === ' ') {
-				event.preventDefault();
-				togglePreview();
-			}
-		});
-
-		void renderPreview();
+		try {
+			setIcon(previewEl, iconName || 'help-circle');
+		} catch {
+			previewEl.setText('?');
+		}
 	}
 
 	private getButtonSummary(button: CustomButton): string {
 		const target = (() => {
 			switch (button.type) {
 				case 'command':
-					return button.command || '未设置命令';
+					return this.getCommandDisplayName(button.command);
 				case 'command-group':
-					return button.commands.length > 0 ? `${button.commands.length} 个命令` : '未设置命令组';
+					return this.getCommandGroupSummary(button.commands);
 				case 'file':
 					return button.file || '未设置文件';
 				case 'url':
@@ -378,7 +389,9 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 			.addExtraButton((extraButton) => extraButton
 				.setIcon('trash')
 				.setTooltip('删除分割线')
-				.onClick(() => this.removeButtonItem(area, index)));
+				.onClick(() => {
+					void this.confirmRemoveItem(area, index);
+				}));
 
 		setting.settingEl.addClass('basic-vault-button-setting');
 		setting.settingEl.dataset.index = index.toString();
@@ -404,6 +417,43 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		dragHandle.addEventListener('mouseup', () => {
 			setting.settingEl.setAttribute('draggable', 'false');
 		});
+	}
+
+	private getCommandGroupSummary(commandIds: string[]): string {
+		const names = commandIds
+			.map((commandId) => this.getCommandDisplayName(commandId))
+			.filter((name) => name !== '未设置命令');
+
+		if (names.length === 0) {
+			return '未设置命令组';
+		}
+
+		return names.join('、');
+	}
+
+	private getCommandDisplayName(commandId: string): string {
+		if (!commandId) {
+			return '未设置命令';
+		}
+
+		const command = this.getCommands().find((item) => item.id === commandId);
+		return command?.name || commandId;
+	}
+
+	private getCommands(): Command[] {
+		const commandRegistry = (this.app as App & {
+			commands?: { commands?: Record<string, Command> | Command[] };
+		}).commands?.commands;
+
+		if (Array.isArray(commandRegistry)) {
+			return commandRegistry;
+		}
+
+		if (commandRegistry && typeof commandRegistry === 'object') {
+			return Object.values(commandRegistry);
+		}
+
+		return [];
 	}
 
 	private makeDraggable(element: HTMLElement, index: number, area: ButtonArea) {

@@ -2,27 +2,24 @@ import { App, setIcon, setTooltip } from 'obsidian';
 import { CustomButton } from '../types';
 import { CustomIconManager } from '../utils/customIconManager';
 import { CommandSuggestModal } from './commandSuggestModal';
+import { EditorModal } from './editorModal';
 import { FileSuggestModal } from './fileSuggestModal';
 import { IconSuggestModal } from './iconSuggestModal';
 
-interface ButtonEditorPopoverOptions {
-	anchorEl: HTMLElement;
-	title: string;
+interface ButtonEditorModalOptions {
 	iconFolder: string;
 	iconMask: boolean;
 	onChange: (button: CustomButton) => Promise<void>;
 	onClose?: () => void;
 }
 
-export class ButtonEditorPopover {
+export class ButtonEditorModal {
 	private readonly app: App;
 	private readonly customIconManager: CustomIconManager;
-	private readonly options: ButtonEditorPopoverOptions;
+	private readonly options: ButtonEditorModalOptions;
 	private readonly draft: CustomButton;
-	private readonly mountRoot: HTMLElement | null;
-	private popoverEl: HTMLDivElement | null = null;
+	private modal: EditorModal | null = null;
 	private contentEl: HTMLDivElement | null = null;
-	private cleanupCallbacks: Array<() => void> = [];
 	private nameInputEl: HTMLInputElement | null = null;
 	private valueInputEl: HTMLInputElement | null = null;
 	private typeSelectEl: HTMLSelectElement | null = null;
@@ -33,89 +30,44 @@ export class ButtonEditorPopover {
 	private autoSaveTimer: number | null = null;
 	private lastCommittedState: string;
 
-	constructor(app: App, button: CustomButton, options: ButtonEditorPopoverOptions) {
+	constructor(app: App, button: CustomButton, options: ButtonEditorModalOptions) {
 		this.app = app;
 		this.options = options;
 		this.draft = structuredClone(button);
 		this.lastCommittedState = JSON.stringify(this.draft);
 		this.customIconManager = CustomIconManager.getInstance(app);
-		this.mountRoot = this.options.anchorEl.closest('.modal-container')
-			?? this.options.anchorEl.closest('.modal');
 	}
 
 	open = (): void => {
-		if (this.popoverEl) {
-			this.updateAnchor(this.options.anchorEl);
+		if (this.modal) {
 			return;
 		}
 
-		const mountRoot = this.mountRoot
-			?? this.options.anchorEl.ownerDocument.body;
-
-		this.popoverEl = mountRoot.createDiv({ cls: 'basic-vault-button-popover' });
-		this.popoverEl.addEventListener('mousedown', (event) => {
-			event.stopPropagation();
+		this.modal = new EditorModal(this.app, {
+			modalClass: 'basic-vault-button-editor-modal-shell',
+			contentClass: 'basic-vault-button-editor-modal',
+			onOpen: (contentEl) => {
+				this.contentEl = contentEl as HTMLDivElement;
+				this.render();
+				requestAnimationFrame(() => {
+					this.nameInputEl?.focus();
+					this.nameInputEl?.select();
+				});
+			},
+			onClose: () => {
+				this.contentEl = null;
+				this.nameInputEl = null;
+				this.valueInputEl = null;
+				this.typeSelectEl = null;
+				this.commandGroupContainerEl = null;
+				this.primaryPreviewEl = null;
+				this.togglePreviewEl = null;
+				this.modal = null;
+				this.options.onClose?.();
+			},
 		});
 
-		this.contentEl = this.popoverEl.createDiv({ cls: 'basic-vault-button-popover-content' });
-		this.render();
-
-		const ownerDocument = this.options.anchorEl.ownerDocument;
-		const handlePointerDown = (event: MouseEvent) => {
-			const target = event.target;
-			if (!(target instanceof Node)) {
-				return;
-			}
-			if (target instanceof HTMLElement) {
-				if (target.closest('.suggestion-container')) {
-					return;
-				}
-
-				const modalContainer = target.closest('.modal-container, .modal');
-				if (modalContainer && modalContainer !== this.mountRoot) {
-					return;
-				}
-
-				if (target.closest('.prompt')) {
-					return;
-				}
-			}
-
-			if (
-				this.popoverEl?.contains(target)
-				|| this.options.anchorEl.contains(target)
-			) {
-				return;
-			}
-
-			this.close();
-		};
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') {
-				this.close();
-			}
-		};
-		const handleWindowChange = () => {
-			this.position();
-		};
-
-		ownerDocument.addEventListener('mousedown', handlePointerDown, true);
-		ownerDocument.addEventListener('keydown', handleKeyDown, true);
-		window.addEventListener('resize', handleWindowChange);
-		window.addEventListener('scroll', handleWindowChange, true);
-
-		this.cleanupCallbacks.push(() => {
-			ownerDocument.removeEventListener('mousedown', handlePointerDown, true);
-			ownerDocument.removeEventListener('keydown', handleKeyDown, true);
-			window.removeEventListener('resize', handleWindowChange);
-			window.removeEventListener('scroll', handleWindowChange, true);
-		});
-
-		requestAnimationFrame(() => {
-			this.position();
-			this.nameInputEl?.focus();
-			this.nameInputEl?.select();
-		});
+		this.modal.open();
 	};
 
 	close = (): void => {
@@ -123,17 +75,8 @@ export class ButtonEditorPopover {
 			window.clearTimeout(this.autoSaveTimer);
 			this.autoSaveTimer = null;
 		}
-		this.cleanupCallbacks.forEach((cleanup) => cleanup());
-		this.cleanupCallbacks = [];
-		this.popoverEl?.remove();
-		this.popoverEl = null;
-		this.contentEl = null;
-		this.options.onClose?.();
-	};
 
-	updateAnchor = (anchorEl: HTMLElement): void => {
-		this.options.anchorEl = anchorEl;
-		this.position();
+		this.modal?.close();
 	};
 
 	private render = (): void => {
@@ -143,78 +86,36 @@ export class ButtonEditorPopover {
 
 		this.contentEl.empty();
 
-		const headerEl = this.contentEl.createDiv({ cls: 'basic-vault-button-popover-header' });
-		headerEl.createDiv({
-			cls: 'basic-vault-button-popover-title',
-			text: this.draft.tooltip.trim() || this.options.title,
-		});
-
-		const closeButton = headerEl.createEl('button', {
-			cls: 'clickable-icon basic-vault-button-popover-close',
-			attr: { type: 'button', 'aria-label': '关闭' },
-		});
-		setIcon(closeButton, 'x');
-		closeButton.addEventListener('click', () => {
-			this.close();
-		});
-
 		const nameControlEl = this.createFormRow(this.contentEl, '名称');
-
 		this.nameInputEl = nameControlEl.createEl('input', {
-			cls: 'basic-vault-button-popover-input basic-vault-button-popover-name-input',
+			cls: 'basic-vault-button-editor-input basic-vault-button-editor-name-input',
 			attr: { type: 'text', placeholder: '按钮名称' },
 		});
 		this.nameInputEl.value = this.draft.tooltip;
 		this.nameInputEl.addEventListener('input', () => {
 			this.draft.tooltip = this.nameInputEl?.value ?? '';
-			this.updateTitle();
 			this.scheduleCommit();
 		});
 
-		const compactRowEl = this.contentEl.createDiv({ cls: 'basic-vault-button-popover-compact-row' });
-		this.createIconField(compactRowEl, '主图标', this.draft.icon, false);
-		this.createIconField(compactRowEl, '切换图标', this.draft.toggleIcon, true);
-		compactRowEl.createDiv({
-			cls: 'basic-vault-button-popover-label',
-			text: '按钮类型',
-		});
-		this.typeSelectEl = compactRowEl.createEl('select');
-		this.typeSelectEl.addClass('dropdown');
-		this.typeSelectEl.addClass('basic-vault-button-popover-native-select');
-		[
-			['command', '命令'],
-			['command-group', '命令组'],
-			['file', '文件'],
-			['url', '网址'],
-		].forEach(([value, label]) => {
-			this.typeSelectEl?.createEl('option', { value, text: label });
-		});
-		this.typeSelectEl.value = this.draft.type;
-		this.typeSelectEl.addEventListener('change', () => {
-			this.draft.type = this.typeSelectEl?.value as CustomButton['type'];
-			this.normalizeTypeSpecificValues();
-			this.render();
-			void this.commitChanges();
-		});
+		const metaRowEl = this.contentEl.createDiv({ cls: 'basic-vault-button-editor-compact-row' });
+		this.createIconField(metaRowEl, '主图标', this.draft.icon, false);
+		this.createIconField(metaRowEl, '切换图标', this.draft.toggleIcon, true);
+		this.createTypeField(metaRowEl);
 
 		this.renderValueEditor();
 	};
 
-	private createFormRow(parentEl: HTMLElement, label: string) {
-		const rowEl = parentEl.createDiv({ cls: 'basic-vault-button-popover-form-row' });
-		rowEl.createDiv({
-			cls: 'basic-vault-button-popover-label',
-			text: label,
-		});
-		return rowEl.createDiv({ cls: 'basic-vault-button-popover-control' });
+	private createFormRow(parentEl: HTMLElement, label: string): HTMLElement {
+		const rowEl = parentEl.createDiv({ cls: 'basic-vault-button-editor-form-row' });
+		rowEl.createDiv({ cls: 'basic-vault-button-editor-label', text: label });
+		return rowEl.createDiv({ cls: 'basic-vault-button-editor-control' });
 	}
 
-	private createIconField(parentEl: HTMLElement, label: string, iconName: string, isToggleIcon: boolean) {
-		parentEl.createDiv({ cls: 'basic-vault-button-popover-label', text: label });
-		const fieldEl = parentEl.createDiv({ cls: 'basic-vault-button-popover-icon-field' });
-
+	private createIconField(parentEl: HTMLElement, label: string, iconName: string, isToggleIcon: boolean): void {
+		parentEl.createDiv({ cls: 'basic-vault-button-editor-label', text: label });
+		const fieldEl = parentEl.createDiv({ cls: 'basic-vault-button-editor-icon-field' });
 		const iconButton = fieldEl.createEl('button', {
-			cls: 'icon-picker-button-compact',
+			cls: 'icon-picker-button-compact basic-vault-button-editor-icon-trigger',
 			attr: { type: 'button', 'aria-label': label },
 		});
 		const previewEl = iconButton.createDiv({ cls: 'icon-picker-preview-compact' });
@@ -233,12 +134,29 @@ export class ButtonEditorPopover {
 		});
 	}
 
-	private updateTitle() {
-		const titleEl = this.contentEl?.querySelector<HTMLElement>('.basic-vault-button-popover-title');
-		titleEl?.setText(this.draft.tooltip.trim() || this.options.title);
+	private createTypeField(parentEl: HTMLElement): void {
+		parentEl.createDiv({ cls: 'basic-vault-button-editor-label', text: '按钮类型' });
+		this.typeSelectEl = parentEl.createEl('select', { cls: 'basic-vault-button-editor-select' });
+		this.typeSelectEl.addClass('dropdown');
+		this.typeSelectEl.addClass('basic-vault-button-editor-native-select');
+		[
+			['command', '命令'],
+			['command-group', '命令组'],
+			['file', '文件'],
+			['url', '网址'],
+		].forEach(([value, label]) => {
+			this.typeSelectEl?.createEl('option', { value, text: label });
+		});
+		this.typeSelectEl.value = this.draft.type;
+		this.typeSelectEl.addEventListener('change', () => {
+			this.draft.type = this.typeSelectEl?.value as CustomButton['type'];
+			this.normalizeTypeSpecificValues();
+			this.render();
+			void this.commitChanges();
+		});
 	}
 
-	private renderValueEditor() {
+	private renderValueEditor(): void {
 		if (!this.contentEl) {
 			return;
 		}
@@ -249,30 +167,30 @@ export class ButtonEditorPopover {
 		const valueControlEl = this.createFormRow(this.contentEl, this.getValueFieldName());
 
 		if (this.draft.type === 'command-group') {
-			this.commandGroupContainerEl = valueControlEl.createDiv({ cls: 'basic-vault-button-popover-command-group' });
+			this.commandGroupContainerEl = valueControlEl.createDiv({ cls: 'basic-vault-button-editor-command-group' });
 			this.renderCommandGroupEditor();
 			return;
 		}
 
 		this.valueInputEl = valueControlEl.createEl('input', {
-			cls: 'basic-vault-button-popover-input basic-vault-button-popover-value-input',
+			cls: 'basic-vault-button-editor-input basic-vault-button-editor-value-input',
 			attr: { type: 'text', placeholder: this.getValuePlaceholder() },
 		});
 		this.valueInputEl.value = this.getCurrentValue();
+		this.valueInputEl.classList.toggle('basic-vault-button-editor-picker-input', this.draft.type === 'command' || this.draft.type === 'file');
 		this.valueInputEl.addEventListener('input', () => {
 			this.setCurrentValue(this.valueInputEl?.value ?? '');
 			this.scheduleCommit();
 		});
 
 		if (this.draft.type === 'command' || this.draft.type === 'file') {
-			this.valueInputEl.addClass('basic-vault-button-popover-picker-input');
 			this.valueInputEl.addEventListener('click', () => {
 				void this.openValuePicker();
 			});
 		}
 	}
 
-	private renderCommandGroupEditor() {
+	private renderCommandGroupEditor(): void {
 		if (!this.commandGroupContainerEl) {
 			return;
 		}
@@ -281,23 +199,17 @@ export class ButtonEditorPopover {
 
 		const listEl = this.commandGroupContainerEl.createDiv({ cls: 'basic-vault-button-command-list' });
 		if (this.draft.commands.length === 0) {
-			listEl.createDiv({
-				cls: 'basic-vault-button-command-empty',
-				text: '还没有添加命令'
-			});
+			listEl.createDiv({ cls: 'basic-vault-button-command-empty', text: '还没有添加命令' });
 		}
 
 		this.draft.commands.forEach((commandId, index) => {
 			const rowEl = listEl.createDiv({ cls: 'basic-vault-button-command-row' });
 			rowEl.dataset.index = index.toString();
-			rowEl.createDiv({
-				cls: 'basic-vault-button-command-index',
-				text: `${index + 1}`
-			});
+			rowEl.createDiv({ cls: 'basic-vault-button-command-index', text: `${index + 1}` });
 
 			const inputEl = rowEl.createEl('input', {
-				cls: 'basic-vault-button-popover-input basic-vault-button-command-input basic-vault-button-popover-picker-input',
-				attr: { type: 'text', placeholder: '命令 ID' }
+				cls: 'basic-vault-button-editor-input basic-vault-button-command-input basic-vault-button-editor-picker-input',
+				attr: { type: 'text', placeholder: '命令 ID' },
 			});
 			inputEl.value = commandId;
 			inputEl.addEventListener('input', () => {
@@ -312,6 +224,7 @@ export class ButtonEditorPopover {
 				if (index === 0) {
 					return;
 				}
+
 				[this.draft.commands[index - 1], this.draft.commands[index]] = [this.draft.commands[index], this.draft.commands[index - 1]];
 				this.renderCommandGroupEditor();
 				void this.commitChanges();
@@ -321,6 +234,7 @@ export class ButtonEditorPopover {
 				if (index >= this.draft.commands.length - 1) {
 					return;
 				}
+
 				[this.draft.commands[index + 1], this.draft.commands[index]] = [this.draft.commands[index], this.draft.commands[index + 1]];
 				this.renderCommandGroupEditor();
 				void this.commitChanges();
@@ -334,9 +248,9 @@ export class ButtonEditorPopover {
 		});
 
 		const addButton = this.commandGroupContainerEl.createEl('button', {
-			cls: 'basic-vault-button-popover-text-button',
+			cls: 'basic-vault-button-editor-text-button',
 			text: '+ 添加命令',
-			attr: { type: 'button' }
+			attr: { type: 'button' },
 		});
 		addButton.addEventListener('click', () => {
 			this.draft.commands.push('');
@@ -346,7 +260,7 @@ export class ButtonEditorPopover {
 		});
 	}
 
-	private focusCommandInput(index: number) {
+	private focusCommandInput(index: number): void {
 		window.requestAnimationFrame(() => {
 			const inputEl = this.commandGroupContainerEl?.querySelector<HTMLInputElement>(`.basic-vault-button-command-row[data-index="${index}"] .basic-vault-button-command-input`);
 			inputEl?.focus();
@@ -354,31 +268,34 @@ export class ButtonEditorPopover {
 		});
 	}
 
-	private createIconButton(parentEl: HTMLElement, icon: string, label: string, onClick: () => void) {
+	private createIconButton(parentEl: HTMLElement, icon: string, label: string, onClick: () => void): HTMLButtonElement {
 		const button = parentEl.createEl('button', {
-			cls: 'basic-vault-button-popover-icon-button',
-			attr: { type: 'button', 'aria-label': label, title: label }
+			cls: 'basic-vault-button-editor-icon-button',
+			attr: { type: 'button', 'aria-label': label, title: label },
 		});
 		setIcon(button, icon);
 		button.addEventListener('click', onClick);
 		return button;
 	}
 
-	private async commitChanges() {
+	private async commitChanges(): Promise<void> {
 		if (this.autoSaveTimer !== null) {
 			window.clearTimeout(this.autoSaveTimer);
 			this.autoSaveTimer = null;
 		}
+
 		this.draft.tooltip = this.nameInputEl?.value ?? this.draft.tooltip;
 		if (this.valueInputEl) {
 			this.setCurrentValue(this.valueInputEl.value);
 		}
+
 		const nextButton = structuredClone(this.draft);
 		nextButton.commands = nextButton.commands.map((commandId) => commandId.trim()).filter(Boolean);
 		const nextState = JSON.stringify(nextButton);
 		if (nextState === this.lastCommittedState) {
 			return;
 		}
+
 		this.saveChain = this.saveChain.then(async () => {
 			await this.options.onChange(nextButton);
 			this.lastCommittedState = nextState;
@@ -386,7 +303,7 @@ export class ButtonEditorPopover {
 		await this.saveChain;
 	}
 
-	private scheduleCommit() {
+	private scheduleCommit(): void {
 		if (this.autoSaveTimer !== null) {
 			window.clearTimeout(this.autoSaveTimer);
 		}
@@ -396,7 +313,7 @@ export class ButtonEditorPopover {
 		}, 180);
 	}
 
-	private normalizeTypeSpecificValues() {
+	private normalizeTypeSpecificValues(): void {
 		switch (this.draft.type) {
 			case 'command':
 				this.draft.file = '';
@@ -419,38 +336,6 @@ export class ButtonEditorPopover {
 				this.draft.commands = [];
 				break;
 		}
-	}
-
-	private position() {
-		if (!this.popoverEl) {
-			return;
-		}
-		if (!this.options.anchorEl.isConnected) {
-			this.close();
-			return;
-		}
-
-		const anchorRect = this.options.anchorEl.getBoundingClientRect();
-		const viewportWidth = window.innerWidth;
-		const viewportHeight = window.innerHeight;
-		const maxWidth = Math.min(520, viewportWidth - 24);
-
-		this.popoverEl.style.maxWidth = `${maxWidth}px`;
-		this.popoverEl.style.width = `${Math.min(Math.max(anchorRect.width + 180, 360), maxWidth)}px`;
-
-		const popoverRect = this.popoverEl.getBoundingClientRect();
-		const belowTop = anchorRect.bottom + 6;
-		const canPlaceBelow = belowTop + popoverRect.height <= viewportHeight - 12;
-		const top = canPlaceBelow
-			? Math.min(belowTop, viewportHeight - popoverRect.height - 12)
-			: Math.max(12, anchorRect.top - popoverRect.height - 6);
-		const left = Math.min(
-			Math.max(12, anchorRect.left),
-			viewportWidth - popoverRect.width - 12,
-		);
-
-		this.popoverEl.style.top = `${top}px`;
-		this.popoverEl.style.left = `${left}px`;
 	}
 
 	private getValueFieldName(): string {
@@ -492,7 +377,7 @@ export class ButtonEditorPopover {
 		}
 	}
 
-	private setCurrentValue(value: string) {
+	private setCurrentValue(value: string): void {
 		switch (this.draft.type) {
 			case 'command':
 				this.draft.command = value;
@@ -509,7 +394,7 @@ export class ButtonEditorPopover {
 		}
 	}
 
-	private async openValuePicker() {
+	private async openValuePicker(): Promise<void> {
 		if (this.draft.type === 'command') {
 			new CommandSuggestModal(this.app, (command) => {
 				this.draft.command = command.id;
@@ -532,7 +417,7 @@ export class ButtonEditorPopover {
 		}
 	}
 
-	private async openCommandGroupPicker(index: number, inputEl: HTMLInputElement) {
+	private async openCommandGroupPicker(index: number, inputEl: HTMLInputElement): Promise<void> {
 		new CommandSuggestModal(this.app, (command) => {
 			this.draft.commands[index] = command.id;
 			inputEl.value = command.id;
@@ -540,7 +425,7 @@ export class ButtonEditorPopover {
 		}).open();
 	}
 
-	private async openIconPicker(isToggleIcon: boolean) {
+	private async openIconPicker(isToggleIcon: boolean): Promise<void> {
 		const modal = await IconSuggestModal.create(
 			this.app,
 			this.options.iconFolder,
@@ -564,12 +449,12 @@ export class ButtonEditorPopover {
 					await this.updateIconPreview(selectedIcon, this.togglePreviewEl);
 				}
 				await this.commitChanges();
-			}
+			},
 		);
 		modal.open();
 	}
 
-	private async updateIconPreview(iconName: string, previewEl: HTMLElement) {
+	private async updateIconPreview(iconName: string, previewEl: HTMLElement): Promise<void> {
 		previewEl.empty();
 		if (this.customIconManager.isCustomIcon(iconName)) {
 			const rendered = await this.customIconManager.renderIcon(iconName, previewEl, this.options.iconMask);
