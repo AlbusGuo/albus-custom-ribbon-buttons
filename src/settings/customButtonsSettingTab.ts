@@ -185,7 +185,7 @@ export class CustomButtonsSettingTab extends PluginSettingTab {
 		const addButtonsContainer = containerEl.createDiv({ cls: 'basic-vault-button-add-container' });
 
 		const addButton = addButtonsContainer.createEl('button', {
-			text: area === 'left-ribbon' ? '添加新按钮' : '添加页首按钮',
+			text: area === 'left-ribbon' ? '添加新按钮' : '添加新按钮',
 			cls: 'basic-vault-button-add-btn'
 		});
 		addButton.addEventListener('click', () => {
