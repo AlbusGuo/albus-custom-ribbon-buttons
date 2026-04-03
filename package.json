@@ -1,7 +1,7 @@
 {
 	"name": "albus-custom-buttons",
 	"version": "2.0.0",
-	"description": "改变库按钮的基本布局, 且支持添加自定义功能按钮.",
+	"description": "A plugin to customize the ribbon and page header with custom buttons, dividers, and SVG icon support.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

@@ -16,7 +16,7 @@
   padding: 4px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
-  background: var(--background-primary);
+  background-color: var(--background-primary);
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
   font-size: 14px;
@@ -24,7 +24,7 @@
 }
 
 .icon-picker-button-compact:hover {
-  background: var(--background-modifier-hover);
+  background-color: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
 }
 
