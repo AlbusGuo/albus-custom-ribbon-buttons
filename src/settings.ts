@@ -18,7 +18,7 @@ function normalizeIconName(iconName: string): string {
 		return 'help-circle';
 	}
 
-	return iconName.startsWith('lucide-') ? iconName.slice(7) : iconName;
+	return iconName;
 }
 
 /**
