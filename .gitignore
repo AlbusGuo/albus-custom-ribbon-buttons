@@ -24,3 +24,4 @@ data.json
 .DS_Store
 main.js
 Plugin guidelines.md
+.github/agents/obsidian-plugin-dev.agent.md

@@ -61,51 +61,25 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		document.body.classList.remove('crb-ready');
 	}
 
-	/** 主设置文件路径 */
-	private get dataPath(): string {
-		return `${this.manifest.dir}/data.json`;
-	}
-
-	/** 备份文件路径 */
-	private get backupPath(): string {
-		return `${this.manifest.dir}/data.backup.json`;
-	}
-
-	private async readStoredSettings(): Promise<any> {
-		const exists = await this.app.vault.adapter.exists(this.dataPath);
-		if (exists) {
-			const raw = await this.app.vault.adapter.read(this.dataPath);
-			return JSON.parse(raw);
-		}
-
-		try {
-			return await this.loadData();
-		} catch {
-			return null;
-		}
-	}
-
-	private async writeStoredSettings(data: RibbonVaultButtonsSettings): Promise<void> {
-		const serialized = JSON.stringify(data, null, '\t');
-		await this.app.vault.adapter.write(this.dataPath, serialized);
-	}
-
 	/**
 	 * 加载设置
-	 * 对 data.json 损坏场景做防御处理：先尝试主文件，失败后从备份恢复
+	 * 使用 Obsidian 原生 loadData() API 确保与应用内部数据状态同步
 	 */
 	async loadSettings() {
 		let data: any = null;
+		let recoveredFromBackup = false;
+
 		try {
-			data = await this.readStoredSettings();
+			data = await this.loadData();
 		} catch {
-			// data.json 损坏或为空 — 尝试从备份恢复
-			data = await this.loadBackup();
+			// loadData 异常
 		}
 
 		// 防御：确保 data 是普通对象
 		if (!data || typeof data !== 'object' || Array.isArray(data)) {
-			data = null;
+			// 数据无效 — 尝试从旧版备份文件一次性恢复
+			data = await this.tryRecoverFromLegacyBackup();
+			recoveredFromBackup = data !== null;
 		}
 
 		const { migratedData, didMigrateLegacyIcons } = await this.migrateLegacyCustomIcons(data);
@@ -114,7 +88,7 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 		this.settings = validateAndCleanSettings(this.settings);
 
-		if (didMigrateLegacyIcons) {
+		if (didMigrateLegacyIcons || recoveredFromBackup) {
 			await this.saveSettings();
 		}
 	}
@@ -223,29 +197,31 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	}
 
 	/**
-	 * 从备份文件恢复设置数据
-	 * 若恢复成功，同步修复 data.json
+	 * 一次性从旧版备份文件恢复（过渡用途）
+	 * 旧版本使用 vault.adapter 直接写入 data.backup.json，
+	 * 此方法仅在主数据不可用时尝试读取旧备份以挽回数据。
 	 */
-	private async loadBackup(): Promise<any> {
+	private async tryRecoverFromLegacyBackup(): Promise<any> {
 		try {
-			const raw = await this.app.vault.adapter.read(this.backupPath);
+			const backupPath = `${this.manifest.dir}/data.backup.json`;
+			const exists = await this.app.vault.adapter.exists(backupPath);
+			if (!exists) return null;
+
+			const raw = await this.app.vault.adapter.read(backupPath);
 			const data = JSON.parse(raw);
 			if (data && typeof data === 'object' && !Array.isArray(data)) {
-				// 备份有效，同步修复 data.json
-				await this.writeStoredSettings(validateAndCleanSettings(Object.assign({}, DEFAULT_SETTINGS, data)));
 				return data;
 			}
 		} catch {
-			// 备份也不可用
+			// 备份不可用
 		}
 		return null;
 	}
 
 	/**
 	 * 保存设置（串行化）
-	 * 确保同一时刻只有一次写入操作，快速连续的调用会被合并为一次写入，
-	 * 避免并发 saveData 导致 data.json 被截断损坏。
-	 * 每次写入成功后异步更新备份文件，用于下次加载时的故障恢复。
+	 * 使用 Obsidian 原生 saveData() API 确保与应用内部数据状态同步。
+	 * 快速连续的调用会被合并为一次写入。
 	 */
 	async saveSettings() {
 		this.settings = validateAndCleanSettings(this.settings);
@@ -256,12 +232,9 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 			return;
 		}
 
-		this._savePromise = this.writeStoredSettings(this.settings);
+		this._savePromise = this.saveData(this.settings);
 		try {
 			await this._savePromise;
-			// 写入成功 — 异步更新备份（不阻塞主流程）
-			const dataStr = JSON.stringify(this.settings, null, '\t');
-			this.app.vault.adapter.write(this.backupPath, dataStr).catch(() => {});
 		} finally {
 			this._savePromise = null;
 		}
