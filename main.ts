@@ -1,9 +1,17 @@
 import { Plugin } from 'obsidian';
-import { LegacyCustomIcon, RibbonVaultButtonsSettings } from './src/types';
+import { LegacyCustomIcon, RibbonVaultButtonsSettings, ButtonItem, CustomButton } from './src/types';
 import { DEFAULT_SETTINGS, isValidSvgContent, validateAndCleanSettings } from './src/settings';
 import { ButtonManager } from './src/utils/buttonManager';
 import { CustomButtonsSettingTab } from './src/settings/customButtonsSettingTab';
 import { CustomIconManager } from './src/utils/customIconManager';
+
+/**
+ * 判断值是否为普通对象（非 null、非数组）
+ * 参考 custom-about-blank 的 isPlainObject 实现
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return Object.prototype.toString.call(value) === '[object Object]';
+}
 
 /**
  * Ribbon Vault Buttons 插件主类
@@ -13,10 +21,6 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 	settings: RibbonVaultButtonsSettings;
 	buttonManager: ButtonManager;
 	customIconManager: CustomIconManager;
-	/** 当前正在执行的保存操作 */
-	private _savePromise: Promise<void> | null = null;
-	/** 是否有等待中的保存请求 */
-	private _savePending = false;
 
 	async onload() {
 		// 确保初始化期间功能区不可见（配合 CSS 中 crb-ready 规则）
@@ -61,36 +65,94 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		document.body.classList.remove('crb-ready');
 	}
 
+	// =========================================================================
+	// 数据持久化（参考 custom-about-blank 的白名单策略）
+	// =========================================================================
+
+	/**
+	 * 清理并规范化设置对象形状
+	 * 
+	 * 采用白名单策略：始终从 DEFAULT_SETTINGS 的深拷贝出发，
+	 * 仅复制输入中已知且类型正确的字段，避免任何脏数据进入 settings。
+	 * 此方法在加载和保存时均被调用，确保 settings 始终具有合法的形状。
+	 */
+	private sanitizeSettingsShape(raw: unknown): RibbonVaultButtonsSettings {
+		const defaults = structuredClone(DEFAULT_SETTINGS);
+
+		if (!isPlainObject(raw)) {
+			return defaults;
+		}
+
+		const data = raw as Record<string, unknown>;
+
+		// 白名单：只复制 DEFAULT_SETTINGS 中定义的 key，且严格校验类型
+		const sanitized: RibbonVaultButtonsSettings = {
+			leftRibbonItems: Array.isArray(data.leftRibbonItems)
+				? data.leftRibbonItems as ButtonItem[]
+				: defaults.leftRibbonItems,
+			pageHeaderItems: Array.isArray(data.pageHeaderItems)
+				? data.pageHeaderItems as CustomButton[]
+				: defaults.pageHeaderItems,
+			iconFolder: typeof data.iconFolder === 'string' ? data.iconFolder : defaults.iconFolder,
+			iconMask: typeof data.iconMask === 'boolean' ? data.iconMask : defaults.iconMask,
+			hideBuiltInButtons: typeof data.hideBuiltInButtons === 'boolean'
+				? data.hideBuiltInButtons
+				: defaults.hideBuiltInButtons,
+			hideDefaultActions: typeof data.hideDefaultActions === 'boolean'
+				? data.hideDefaultActions
+				: defaults.hideDefaultActions,
+			settingsTab:
+				data.settingsTab === 'general' ||
+				data.settingsTab === 'left-ribbon' ||
+				data.settingsTab === 'page-header'
+					? (data.settingsTab as RibbonVaultButtonsSettings['settingsTab'])
+					: defaults.settingsTab,
+		};
+
+		// 按钮级别的深度清理（图标名、命令、文件、URL 等字段）
+		return validateAndCleanSettings(sanitized);
+	}
+
 	/**
 	 * 加载设置
-	 * 使用 Obsidian 原生 loadData() API 确保与应用内部数据状态同步
+	 * 
+	 * 对齐 custom-about-blank 的简洁模式：
+	 * loadData → sanitizeSettingsShape 白名单清理 → 完成。
+	 * 如果 data.json 损坏导致 loadData 失败，sanitizeSettingsShape 自动返回默认设置。
 	 */
 	async loadSettings() {
-		let data: any = null;
-		let recoveredFromBackup = false;
+		let rawData: unknown = null;
 
 		try {
-			data = await this.loadData();
+			rawData = await this.loadData();
 		} catch {
-			// loadData 异常
+			// loadData() 内部 JSON.parse 失败（文件为空或截断），rawData 保持 null
 		}
 
-		// 防御：确保 data 是普通对象
-		if (!data || typeof data !== 'object' || Array.isArray(data)) {
-			// 数据无效 — 尝试从旧版备份文件一次性恢复
-			data = await this.tryRecoverFromLegacyBackup();
-			recoveredFromBackup = data !== null;
+		// 处理旧版内联自定义图标迁移（仅在数据为有效对象时执行）
+		if (isPlainObject(rawData)) {
+			const { migratedData, didMigrateLegacyIcons } = await this.migrateLegacyCustomIcons(rawData);
+			this.settings = this.sanitizeSettingsShape(migratedData);
+			if (didMigrateLegacyIcons) {
+				await this.saveData(this.settings);
+			}
+			return;
 		}
 
-		const { migratedData, didMigrateLegacyIcons } = await this.migrateLegacyCustomIcons(data);
-		data = migratedData;
+		// 数据无效：sanitizeSettingsShape 返回默认设置
+		this.settings = this.sanitizeSettingsShape(rawData);
+	}
 
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
-		this.settings = validateAndCleanSettings(this.settings);
-
-		if (didMigrateLegacyIcons || recoveredFromBackup) {
-			await this.saveSettings();
-		}
+	/**
+	 * 保存设置
+	 * 
+	 * 保存前始终通过 sanitizeSettingsShape 清理数据形状，
+	 * 确保写入磁盘的数据永远合法。
+	 * 对齐 custom-about-blank 的简洁模式：清理 → 写入，无额外队列。
+	 */
+	async saveSettings() {
+		this.settings = this.sanitizeSettingsShape(this.settings);
+		await this.saveData(this.settings);
 	}
 
 	/** 旧版内联图标迁移目录 */
@@ -194,56 +256,6 @@ export default class RibbonVaultButtonsPlugin extends Plugin {
 		}
 
 		return iconNames;
-	}
-
-	/**
-	 * 一次性从旧版备份文件恢复（过渡用途）
-	 * 旧版本使用 vault.adapter 直接写入 data.backup.json，
-	 * 此方法仅在主数据不可用时尝试读取旧备份以挽回数据。
-	 */
-	private async tryRecoverFromLegacyBackup(): Promise<any> {
-		try {
-			const backupPath = `${this.manifest.dir}/data.backup.json`;
-			const exists = await this.app.vault.adapter.exists(backupPath);
-			if (!exists) return null;
-
-			const raw = await this.app.vault.adapter.read(backupPath);
-			const data = JSON.parse(raw);
-			if (data && typeof data === 'object' && !Array.isArray(data)) {
-				return data;
-			}
-		} catch {
-			// 备份不可用
-		}
-		return null;
-	}
-
-	/**
-	 * 保存设置（串行化）
-	 * 使用 Obsidian 原生 saveData() API 确保与应用内部数据状态同步。
-	 * 快速连续的调用会被合并为一次写入。
-	 */
-	async saveSettings() {
-		this.settings = validateAndCleanSettings(this.settings);
-
-		// 如果已有写入正在进行，标记待写入并立即返回
-		if (this._savePromise) {
-			this._savePending = true;
-			return;
-		}
-
-		this._savePromise = this.saveData(this.settings);
-		try {
-			await this._savePromise;
-		} finally {
-			this._savePromise = null;
-		}
-
-		// 写入完成后如果有新的待写入请求，再执行一次（使用最新内存数据）
-		if (this._savePending) {
-			this._savePending = false;
-			await this.saveSettings();
-		}
 	}
 
 	/**
